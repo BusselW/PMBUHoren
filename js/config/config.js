@@ -70,6 +70,12 @@ export const FIELD_CONFIG = [
         description: 'Met wie er is gesproken tijdens de hoorzitting.'
     },
     {
+        displayName: 'Bedrijfsnaam',
+        internalName: 'Bedrijfsnaam',
+        fieldType: 'Text',
+        description: 'De naam van het bedrijf (bij gemachtigde).'
+    },
+    {
         displayName: 'Feitomschrijving',
         internalName: 'Feitomschrijving',
         fieldType: 'Note',

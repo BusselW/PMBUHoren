@@ -323,6 +323,7 @@
                     EndTime: caseData.endTime || '',
                     Verslaglegger: caseData.verslaglegger || '',
                     GesprokenMet: caseData.gesprokenMet || '',
+                    Bedrijfsnaam: caseData.bedrijfsnaam || '',
                     Status: caseData.status || 'Bezig met uitwerken'
                 };
             }
@@ -351,6 +352,7 @@
                 endTime: '',
                 verslaglegger: '',
                 gesprokenMet: '',
+                bedrijfsnaam: '',
                 status: 'Bezig met uitwerken', // Matches SharePoint exactly
                 isModified: false,
             }));
@@ -358,7 +360,7 @@
 
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
-        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus, useGlobalVerslaglegger }) => {
+        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus, useGlobalGesprokenMet }) => {
             const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, betrokkene, eigenaar, soort, aantekeninghoorverzoek, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, verslaglegger, gesprokenMet, status, isModified, sharePointId } = caseData;
 
             const handleInputChange = (e) => {
@@ -640,7 +642,7 @@
                             </div>
 
                             <!-- Gesproken Met (conditional) -->
-                            ${!useGlobalVerslaglegger && html`
+                            ${!useGlobalGesprokenMet && html`
                                 <div class="mb-4 flex flex-col">
                                     <label for=${`gesprokenMet-${id}`} class="mb-1 font-semibold text-gray-600">Gesproken Met</label>
                                     <input
@@ -652,23 +654,6 @@
                                         onFocus=${handleFocus}
                                         class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                                         placeholder="Met wie is er gesproken?"
-                                    />
-                                </div>
-                            `}
-
-                            <!-- Verslaglegger (conditional) -->
-                            ${!useGlobalVerslaglegger && html`
-                                <div class="mb-4 flex flex-col">
-                                    <label for=${`verslaglegger-${id}`} class="mb-1 font-semibold text-gray-600">Verslaglegger</label>
-                                    <input
-                                        type="text"
-                                        id=${`verslaglegger-${id}`}
-                                        name="verslaglegger"
-                                        value=${verslaglegger}
-                                        onInput=${handleInputChange}
-                                        onFocus=${handleFocus}
-                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                        placeholder="Naam van de verslaglegger"
                                     />
                                 </div>
                             `}
@@ -720,7 +705,10 @@
             const [availableDates, setAvailableDates] = useState([]);
             const [loadingDates, setLoadingDates] = useState(false);
             const [globalVerslaglegger, setGlobalVerslaglegger] = useState('');
-            const [useGlobalVerslaglegger, setUseGlobalVerslaglegger] = useState(true);
+            const [globalGesprokenMet, setGlobalGesprokenMet] = useState('');
+            const [useGlobalGesprokenMet, setUseGlobalGesprokenMet] = useState(true);
+            const [isGemachtigde, setIsGemachtigde] = useState(true);
+            const [globalBedrijfsnaam, setGlobalBedrijfsnaam] = useState('');
 
             // Test SharePoint connection on load
             useEffect(() => {
@@ -864,6 +852,7 @@
                                 endTime: endTime,
                                 verslaglegger: findColumnValue(row, ['Verslaglegger', 'verslaglegger']),
                                 gesprokenMet: '',
+                                bedrijfsnaam: findColumnValue(row, ['Bedrijfsnaam', 'bedrijfsnaam', 'Bedrijf']),
                                 status: 'Bezig met uitwerken',
                                 isModified: true,
                             };
@@ -891,6 +880,7 @@
                                 endTime: '',
                                 verslaglegger: '',
                                 gesprokenMet: '',
+                                bedrijfsnaam: '',
                                 status: 'Bezig met uitwerken',
                                 isModified: false,
                             });
@@ -924,10 +914,12 @@
                 setIsLoading(true);
                 
                 try {
-                    // Apply global verslaglegger if enabled
+                    // Apply global fields based on settings
                     const finalCaseData = {
                         ...caseData,
-                        verslaglegger: useGlobalVerslaglegger ? globalVerslaglegger : caseData.verslaglegger
+                        verslaglegger: globalVerslaglegger, // Always global
+                        gesprokenMet: useGlobalGesprokenMet ? globalGesprokenMet : caseData.gesprokenMet,
+                        bedrijfsnaam: isGemachtigde ? globalBedrijfsnaam : ''
                     };
                     
                     const sharePointData = sharePointService.transformCaseToSharePoint(finalCaseData);
@@ -980,10 +972,12 @@
                 setIsLoading(true);
                 
                 try {
-                    // Apply global verslaglegger if enabled
+                    // Apply global fields based on settings
                     const finalCaseData = {
                         ...caseData,
-                        verslaglegger: useGlobalVerslaglegger ? globalVerslaglegger : caseData.verslaglegger
+                        verslaglegger: globalVerslaglegger, // Always global
+                        gesprokenMet: useGlobalGesprokenMet ? globalGesprokenMet : caseData.gesprokenMet,
+                        bedrijfsnaam: isGemachtigde ? globalBedrijfsnaam : ''
                     };
                     
                     const sharePointData = sharePointService.transformCaseToSharePoint(finalCaseData);
@@ -1031,10 +1025,12 @@
                         // Only save cases that have some data or are modified
                         if (caseData.isModified || caseData.zaaknummer || caseData.feitcode || caseData.reactie) {
                             try {
-                                // Apply global verslaglegger if enabled
+                                // Apply global fields based on settings
                                 const finalCaseData = {
                                     ...caseData,
-                                    verslaglegger: useGlobalVerslaglegger ? globalVerslaglegger : caseData.verslaglegger
+                                    verslaglegger: globalVerslaglegger, // Always global
+                                    gesprokenMet: useGlobalGesprokenMet ? globalGesprokenMet : caseData.gesprokenMet,
+                                    bedrijfsnaam: isGemachtigde ? globalBedrijfsnaam : ''
                                 };
                                 
                                 const sharePointData = sharePointService.transformCaseToSharePoint(finalCaseData);
@@ -1154,6 +1150,7 @@
                         endTime: spCase.EndTime || '',
                         verslaglegger: spCase.Verslaglegger || '',
                         gesprokenMet: spCase.GesprokenMet || '',
+                        bedrijfsnaam: spCase.Bedrijfsnaam || '',
                         status: spCase.Status || 'Bezig met uitwerken',
                         isModified: false,
                     }));
@@ -1180,6 +1177,7 @@
                             endTime: '',
                             verslaglegger: '',
                             gesprokenMet: '',
+                            bedrijfsnaam: '',
                             status: 'Bezig met uitwerken',
                             isModified: false,
                         });
@@ -1344,37 +1342,13 @@
                             </div>
                         </div>
                         
-                        <!-- Verslaglegger Controls -->
+                        <!-- Global Controls -->
                         <div class="border-t border-gray-200 bg-gray-50">
                             <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
-                                <div class="flex flex-wrap items-center justify-between gap-4">
-                                    <!-- Toggle Switch for Global Verslaglegger -->
-                                    <div class="flex items-center space-x-3">
-                                        <label class="text-sm font-medium text-gray-700">Gesproken Met:</label>
-                                        <div class="relative inline-block w-12 h-6">
-                                            <input
-                                                type="checkbox"
-                                                id="verslaglegger-toggle"
-                                                checked=${useGlobalVerslaglegger}
-                                                onChange=${(e) => setUseGlobalVerslaglegger(e.target.checked)}
-                                                class="sr-only"
-                                            />
-                                            <label
-                                                for="verslaglegger-toggle"
-                                                class=${`block w-12 h-6 rounded-full cursor-pointer transition-colors duration-300 ${useGlobalVerslaglegger ? 'bg-blue-600' : 'bg-gray-300'}`}
-                                            >
-                                                <span
-                                                    class=${`block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 mt-1 ${useGlobalVerslaglegger ? 'translate-x-7' : 'translate-x-1'}`}
-                                                ></span>
-                                            </label>
-                                        </div>
-                                        <span class="text-sm text-gray-600">
-                                            ${useGlobalVerslaglegger ? 'Globaal voor alle zaken' : 'Per zaak individueel'}
-                                        </span>
-                                    </div>
-                                    
-                                    <!-- Global Verslaglegger Input (only shown when toggle is ON) -->
-                                    ${useGlobalVerslaglegger && html`
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <!-- Row 1: Verslaglegger (always global) and GesprokenMet toggle -->
+                                    <div class="flex flex-wrap items-center gap-4">
+                                        <!-- Global Verslaglegger (always shown) -->
                                         <div class="flex items-center space-x-3">
                                             <label for="global-verslaglegger" class="text-sm font-medium text-gray-700">Verslaglegger:</label>
                                             <input
@@ -1382,11 +1356,94 @@
                                                 id="global-verslaglegger"
                                                 value=${globalVerslaglegger}
                                                 onInput=${(e) => setGlobalVerslaglegger(e.target.value)}
-                                                class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition w-64"
+                                                class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition w-48"
                                                 placeholder="Naam van de verslaglegger"
                                             />
                                         </div>
-                                    `}
+                                        
+                                        <!-- GesprokenMet Toggle -->
+                                        <div class="flex items-center space-x-3">
+                                            <label class="text-sm font-medium text-gray-700">Gesproken Met:</label>
+                                            <div class="relative inline-block w-12 h-6">
+                                                <input
+                                                    type="checkbox"
+                                                    id="gesproken-met-toggle"
+                                                    checked=${useGlobalGesprokenMet}
+                                                    onChange=${(e) => setUseGlobalGesprokenMet(e.target.checked)}
+                                                    class="sr-only"
+                                                />
+                                                <label
+                                                    for="gesproken-met-toggle"
+                                                    class=${`block w-12 h-6 rounded-full cursor-pointer transition-colors duration-300 ${useGlobalGesprokenMet ? 'bg-blue-600' : 'bg-gray-300'}`}
+                                                >
+                                                    <span
+                                                        class=${`block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 mt-1 ${useGlobalGesprokenMet ? 'translate-x-7' : 'translate-x-1'}`}
+                                                    ></span>
+                                                </label>
+                                            </div>
+                                            <span class="text-sm text-gray-600">
+                                                ${useGlobalGesprokenMet ? 'Globaal' : 'Per zaak'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Row 2: GesprokenMet input and Gemachtigde/Burger toggle -->
+                                    <div class="flex flex-wrap items-center gap-4">
+                                        <!-- Global GesprokenMet Input (only shown when toggle is ON) -->
+                                        ${useGlobalGesprokenMet && html`
+                                            <div class="flex items-center space-x-3">
+                                                <label for="global-gesproken-met" class="text-sm font-medium text-gray-700">Gesproken Met:</label>
+                                                <input
+                                                    type="text"
+                                                    id="global-gesproken-met"
+                                                    value=${globalGesprokenMet}
+                                                    onInput=${(e) => setGlobalGesprokenMet(e.target.value)}
+                                                    class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition w-48"
+                                                    placeholder="Met wie gesproken"
+                                                />
+                                            </div>
+                                        `}
+                                        
+                                        <!-- Gemachtigde/Burger Toggle -->
+                                        <div class="flex items-center space-x-3">
+                                            <span class="text-sm font-medium text-gray-700">Type:</span>
+                                            <div class="relative inline-block w-16 h-6">
+                                                <input
+                                                    type="checkbox"
+                                                    id="type-toggle"
+                                                    checked=${isGemachtigde}
+                                                    onChange=${(e) => setIsGemachtigde(e.target.checked)}
+                                                    class="sr-only"
+                                                />
+                                                <label
+                                                    for="type-toggle"
+                                                    class=${`block w-16 h-6 rounded-full cursor-pointer transition-colors duration-300 ${isGemachtigde ? 'bg-green-600' : 'bg-blue-600'}`}
+                                                >
+                                                    <span
+                                                        class=${`block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 mt-1 ${isGemachtigde ? 'translate-x-1' : 'translate-x-11'}`}
+                                                    ></span>
+                                                </label>
+                                            </div>
+                                            <span class="text-sm text-gray-600 font-medium">
+                                                ${isGemachtigde ? 'Gemachtigde' : 'Burger'}
+                                            </span>
+                                        </div>
+                                        
+                                        <!-- Bedrijfsnaam (only shown when Gemachtigde is selected) -->
+                                        ${isGemachtigde && html`
+                                            <div class="flex items-center space-x-3">
+                                                <label for="global-bedrijfsnaam" class="text-sm font-medium text-gray-700">Bedrijfsnaam:</label>
+                                                <input
+                                                    type="text"
+                                                    id="global-bedrijfsnaam"
+                                                    value=${globalBedrijfsnaam}
+                                                    onInput=${(e) => setGlobalBedrijfsnaam(e.target.value)}
+                                                    class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition w-48"
+                                                    placeholder="Naam van het bedrijf"
+                                                />
+                                            </div>
+                                        `}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1405,7 +1462,7 @@
                                     onSaveIndividual=${handleSaveIndividual}
                                     onTempSave=${handleTempSave}
                                     connectionStatus=${connectionStatus}
-                                    useGlobalVerslaglegger=${useGlobalVerslaglegger}
+                                    useGlobalGesprokenMet=${useGlobalGesprokenMet}
                                     isActive=${index === activeCaseIndex}
                                 />
                             `)}
