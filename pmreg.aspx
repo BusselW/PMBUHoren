@@ -189,8 +189,8 @@
 
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
-        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual }) => {
-            const { id, zaaknummer, feitcode, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, status, isModified } = caseData;
+        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave }) => {
+            const { id, zaaknummer, feitcode, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, status, isModified, sharePointId } = caseData;
 
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
@@ -205,8 +205,13 @@
                 onSaveIndividual(index);
             };
 
+            const handleTempSave = () => {
+                onTempSave(index);
+            };
+
             const cardBorderColor = isModified ? 'border-blue-500' : 'border-gray-200';
             const activeShadow = isActive ? 'shadow-xl' : 'shadow-md';
+            const hasSharePointId = sharePointId !== null && sharePointId !== undefined;
 
             return html`
                 <div 
@@ -215,12 +220,24 @@
                 >
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-bold text-gray-700">Zaak #${index + 1}</h3>
-                        <button
-                            onClick=${handleSaveCase}
-                            class="bg-green-600 text-white font-bold py-1 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-300 text-sm"
-                        >
-                            Opslaan
-                        </button>
+                        <div class="flex space-x-2">
+                            ${hasSharePointId && html`
+                                <button
+                                    onClick=${handleTempSave}
+                                    class="bg-orange-500 text-white font-bold py-1 px-4 rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm"
+                                    title="Tijdelijk opslaan voor aanpassingen"
+                                >
+                                    Temp. Opslaan
+                                </button>
+                            `}
+                            <button
+                                onClick=${handleSaveCase}
+                                class="bg-green-600 text-white font-bold py-1 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-300 text-sm"
+                                title=${hasSharePointId ? "Definitief opslaan" : "Nieuwe zaak opslaan"}
+                            >
+                                ${hasSharePointId ? "Definitief" : "Opslaan"}
+                            </button>
+                        </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <!-- Zaaknummer -->
@@ -428,6 +445,55 @@
                 }
             };
 
+            // Temporary save for existing cases (update only)
+            const handleTempSave = async (index) => {
+                const caseData = cases[index];
+                
+                // Only allow temp save for existing SharePoint items
+                if (!caseData.sharePointId) {
+                    setModalContent({
+                        title: 'Geen bestaande zaak',
+                        message: `Zaak #${index + 1} moet eerst definitief worden opgeslagen voordat deze tijdelijk kan worden bijgewerkt.`
+                    });
+                    setShowInfoModal(true);
+                    return;
+                }
+                
+                setIsLoading(true);
+                
+                try {
+                    const sharePointData = sharePointService.transformCaseToSharePoint(caseData);
+                    
+                    // Add temporary status flag to indicate this is a work-in-progress update
+                    const tempData = {
+                        ...sharePointData,
+                        Status: 'Bezig met uitwerken' // Force status to indicate work in progress
+                    };
+                    
+                    await sharePointService.updateItem(caseData.sharePointId, tempData);
+                    
+                    // Update local state to reflect saved changes
+                    const updatedCase = { ...caseData, isModified: false, status: 'Bezig met uitwerken' };
+                    handleUpdateCase(index, updatedCase);
+                    
+                    setModalContent({
+                        title: 'Tijdelijk Opgeslagen',
+                        message: `Zaak #${index + 1} is tijdelijk opgeslagen. Status is ingesteld op 'Bezig met uitwerken' voor verdere bewerking.`
+                    });
+                    setShowInfoModal(true);
+                    
+                } catch (error) {
+                    console.error('Error temporary saving case:', error);
+                    setModalContent({
+                        title: 'Fout',
+                        message: `Er is een fout opgetreden bij het tijdelijk opslaan van zaak #${index + 1}: ${error.message}`
+                    });
+                    setShowInfoModal(true);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
             // Handle saving all cases
             const handleSaveAll = async () => {
                 setIsLoading(true);
@@ -557,6 +623,7 @@
                                     onUpdate=${handleUpdateCase}
                                     onFocus=${handleFocusCase}
                                     onSaveIndividual=${handleSaveIndividual}
+                                    onTempSave=${handleTempSave}
                                     isActive=${index === activeCaseIndex}
                                 />
                             `)}
