@@ -26,12 +26,19 @@ This application integrates with SharePoint to manage hearing notes (Hoorzitting
 | Status | Status | Choice | Case status with predefined options |
 | Gebruiker | Username | Single line of text | Name of the employee who entered the notes (auto-filled) |
 
-### Status Field Choices
+### Status Field Choices (Updated to match SharePoint)
 - Bezig met uitwerken
 - Aangehouden
-- Afgehandeld
+- Afgerond  <!-- Changed from 'Afgehandeld' to match SharePoint exactly -->
 
 ## Features
+
+### Connection Status
+- **Real-time connection indicator** in the header
+- **Green dot**: SharePoint connection successful
+- **Yellow dot**: Testing connection
+- **Red dot**: Connection failed
+- **Smart button disabling**: Save functions disabled when connection fails
 
 ### Individual Case Management
 - Each case card has its own "Opslaan" (Save) button for final saves
@@ -68,14 +75,26 @@ This application integrates with SharePoint to manage hearing notes (Hoorzitting
 
 ### Creating New Cases
 1. Fill in case details in the form fields
-2. Use the individual "Opslaan" button or "Alles Opslaan" for bulk save
+2. Use the green "Opslaan" button to create a new case in SharePoint
 3. Cases are automatically assigned a SharePoint ID upon creation
+4. Once saved, the "Temp. Opslaan" button becomes available
 
 ### Updating Existing Cases
 1. Modify any field in an existing case
 2. The case border turns blue to indicate modifications
-3. Save individually or as part of bulk operation
-4. Updates are merged with existing SharePoint items
+3. **For temporary updates**: Use orange "Temp. Opslaan" button
+   - Updates data in SharePoint immediately
+   - Sets status to "Bezig met uitwerken" automatically
+   - Perfect for pre-hearing data preparation
+4. **For final updates**: Use green "Definitief" button
+   - Saves with current status selection
+   - Use when case handling is complete
+
+### Temporary Save Workflow
+1. **Initial Save**: Create case with green "Opslaan" button
+2. **Pre-hearing Updates**: Use orange "Temp. Opslaan" for ongoing changes
+3. **Final Save**: Use green "Definitief" when case is completed
+4. **Status Management**: Temp saves always mark as "Bezig met uitwerken"
 
 ### Time Entry
 - Use the time picker controls for Start and End times

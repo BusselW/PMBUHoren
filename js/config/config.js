@@ -3,6 +3,7 @@ export const SHAREPOINT_CONFIG = {
     siteUrl: 'https://som.org.om.local/sites/MulderT/T/',
     listName: 'PMREG',
     apiUrl: 'https://som.org.om.local/sites/MulderT/T/_api/web/',
+    contextApiUrl: 'https://som.org.om.local/sites/MulderT/T/_api/', // Separate URL for contextinfo
     listUrl: 'https://som.org.om.local/sites/MulderT/T/PMREG/',
 };
 
@@ -60,8 +61,8 @@ export const FIELD_CONFIG = [
         displayName: 'Status',
         internalName: 'Status',
         fieldType: 'Choice',
-        description: 'Status van de zaak (bijv. \'Nieuw\', \'In behandeling\', \'Afgehandeld\').',
-        choices: ['Bezig met uitwerken', 'Aangehouden', 'Afgehandeld']
+        description: 'Status van de zaak (bijv. \'Nieuw\', \'In behandeling\', \'Afgerond\').',
+        choices: ['Bezig met uitwerken', 'Aangehouden', 'Afgerond']  // Updated to match SharePoint
     },
     {
         displayName: 'Gebruiker',
@@ -71,9 +72,9 @@ export const FIELD_CONFIG = [
     }
 ];
 
-// Status choices
+// Status choices (matching SharePoint exactly)
 export const STATUS_CHOICES = [
     'Bezig met uitwerken',
     'Aangehouden',
-    'Afgehandeld'
+    'Afgerond'  // Changed from 'Afgehandeld' to match SharePoint
 ];

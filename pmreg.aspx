@@ -24,14 +24,15 @@
             siteUrl: 'https://som.org.om.local/sites/MulderT/T/',
             listName: 'PMREG',
             apiUrl: 'https://som.org.om.local/sites/MulderT/T/_api/web/',
+            contextApiUrl: 'https://som.org.om.local/sites/MulderT/T/_api/', // Separate URL for contextinfo
             listUrl: 'https://som.org.om.local/sites/MulderT/T/PMREG/',
         };
 
-        // Status choices
+        // Status choices (matching SharePoint exactly)
         const STATUS_CHOICES = [
             'Bezig met uitwerken',
             'Aangehouden',
-            'Afgehandeld'
+            'Afgerond'  // Changed from 'Afgehandeld' to match SharePoint
         ];
 
         // SharePoint Service Class
@@ -40,12 +41,13 @@
                 this.siteUrl = SHAREPOINT_CONFIG.siteUrl;
                 this.listName = SHAREPOINT_CONFIG.listName;
                 this.apiUrl = SHAREPOINT_CONFIG.apiUrl;
+                this.contextApiUrl = SHAREPOINT_CONFIG.contextApiUrl;
                 this.currentUser = null;
             }
 
             async getRequestDigest() {
                 try {
-                    const response = await fetch(`${this.apiUrl}contextinfo`, {
+                    const response = await fetch(`${this.contextApiUrl}contextinfo`, {
                         method: 'POST',
                         headers: {
                             'Accept': 'application/json;odata=verbose',
@@ -85,6 +87,42 @@
                     return data.d;
                 } catch (error) {
                     console.error('Error getting current user:', error);
+                    throw error;
+                }
+            }
+
+            // Test SharePoint connection
+            async testConnection() {
+                try {
+                    // First test basic web access
+                    const webResponse = await fetch(`${this.apiUrl}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json;odata=verbose'
+                        },
+                        credentials: 'include'
+                    });
+                    
+                    if (!webResponse.ok) {
+                        throw new Error(`Cannot access SharePoint web: ${webResponse.status}`);
+                    }
+
+                    // Then test list access
+                    const listResponse = await fetch(`${this.apiUrl}lists/getbytitle('${this.listName}')`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json;odata=verbose'
+                        },
+                        credentials: 'include'
+                    });
+                    
+                    if (!listResponse.ok) {
+                        throw new Error(`Cannot access list '${this.listName}': ${listResponse.status}`);
+                    }
+
+                    return { success: true, message: 'SharePoint connection successful' };
+                } catch (error) {
+                    console.error('SharePoint connection test failed:', error);
                     throw error;
                 }
             }
@@ -182,14 +220,14 @@
                 hearingDate: new Date().toISOString().split('T')[0], // Today's date
                 startTime: '',
                 endTime: '',
-                status: 'Bezig met uitwerken',
+                status: 'Bezig met uitwerken', // Matches SharePoint exactly
                 isModified: false,
             }));
         };
 
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
-        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave }) => {
+        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus }) => {
             const { id, zaaknummer, feitcode, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, status, isModified, sharePointId } = caseData;
 
             const handleInputChange = (e) => {
@@ -224,7 +262,8 @@
                             ${hasSharePointId && html`
                                 <button
                                     onClick=${handleTempSave}
-                                    class="bg-orange-500 text-white font-bold py-1 px-4 rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm"
+                                    disabled=${connectionStatus !== 'success'}
+                                    class="bg-orange-500 text-white font-bold py-1 px-4 rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Tijdelijk opslaan voor aanpassingen"
                                 >
                                     Temp. Opslaan
@@ -232,7 +271,8 @@
                             `}
                             <button
                                 onClick=${handleSaveCase}
-                                class="bg-green-600 text-white font-bold py-1 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-300 text-sm"
+                                disabled=${connectionStatus !== 'success'}
+                                class="bg-green-600 text-white font-bold py-1 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                 title=${hasSharePointId ? "Definitief opslaan" : "Nieuwe zaak opslaan"}
                             >
                                 ${hasSharePointId ? "Definitief" : "Opslaan"}
@@ -385,6 +425,28 @@
             const [showConfirmModal, setShowConfirmModal] = useState(false);
             const [modalContent, setModalContent] = useState({ title: '', message: '' });
             const [isLoading, setIsLoading] = useState(false);
+            const [connectionStatus, setConnectionStatus] = useState('checking'); // checking, success, failed
+
+            // Test SharePoint connection on load
+            useEffect(() => {
+                const testConnection = async () => {
+                    try {
+                        await sharePointService.testConnection();
+                        setConnectionStatus('success');
+                        console.log('SharePoint connection test successful');
+                    } catch (error) {
+                        setConnectionStatus('failed');
+                        console.error('SharePoint connection test failed:', error);
+                        setModalContent({
+                            title: 'SharePoint Verbindingsfout',
+                            message: `Kan geen verbinding maken met SharePoint: ${error.message}`
+                        });
+                        setShowInfoModal(true);
+                    }
+                };
+                
+                testConnection();
+            }, []);
 
             // Effect to scroll to the active card
             useEffect(() => {
@@ -591,11 +653,27 @@
                     <header class="bg-white shadow-sm sticky top-0 z-20">
                         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
                             <div class="flex flex-wrap justify-between items-center gap-4">
-                                <h1 class="text-3xl font-bold text-gray-800">Hoorzitting Notulen</h1>
+                                <div class="flex items-center space-x-4">
+                                    <h1 class="text-3xl font-bold text-gray-800">Hoorzitting Notulen</h1>
+                                    <div class="flex items-center space-x-2">
+                                        ${connectionStatus === 'checking' && html`
+                                            <div class="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                                            <span class="text-sm text-yellow-600">Verbinding testen...</span>
+                                        `}
+                                        ${connectionStatus === 'success' && html`
+                                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                            <span class="text-sm text-green-600">SharePoint verbonden</span>
+                                        `}
+                                        ${connectionStatus === 'failed' && html`
+                                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                            <span class="text-sm text-red-600">Verbindingsfout</span>
+                                        `}
+                                    </div>
+                                </div>
                                 <div class="flex items-center space-x-3">
                                     <button
                                         onClick=${handleSaveAll}
-                                        disabled=${isLoading}
+                                        disabled=${isLoading || connectionStatus !== 'success'}
                                         class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Alles Opslaan
@@ -624,6 +702,7 @@
                                     onFocus=${handleFocusCase}
                                     onSaveIndividual=${handleSaveIndividual}
                                     onTempSave=${handleTempSave}
+                                    connectionStatus=${connectionStatus}
                                     isActive=${index === activeCaseIndex}
                                 />
                             `)}
