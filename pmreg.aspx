@@ -511,8 +511,42 @@
 
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
-        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus, useGlobalGesprokenMet, handleIndividualTempSave, handleIndividualPrepareForDocGen, handleIndividualFinalize }) => {
-            const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, betrokkene, eigenaar, soort, aantekeninghoorverzoek, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, verslaglegger, gesprokenMet, status, isModified, sharePointId } = caseData;
+        const CaseCard = ({ 
+            caseData = {}, 
+            index = 0, 
+            onUpdate = () => {}, 
+            onFocus = () => {}, 
+            isActive = false, 
+            onSaveIndividual = () => {}, 
+            onTempSave = () => {}, 
+            connectionStatus = 'checking', 
+            useGlobalGesprokenMet = true, 
+            handleIndividualTempSave = () => {}, 
+            handleIndividualPrepareForDocGen = () => {}, 
+            handleIndividualFinalize = () => {} 
+        }) => {
+            const { 
+                id = `case-${index}`, 
+                zaaknummer = '', 
+                feitcode = '', 
+                cjibNummer = '', 
+                cjibLast4 = '', 
+                betrokkene = '', 
+                eigenaar = '', 
+                soort = '', 
+                aantekeninghoorverzoek = '', 
+                feitomschrijving = '', 
+                vooronderzoek = '', 
+                reactie = '', 
+                hearingDate = '', 
+                startTime = '', 
+                endTime = '', 
+                verslaglegger = '', 
+                gesprokenMet = '', 
+                status = 'Nieuw', 
+                isModified = false, 
+                sharePointId = null 
+            } = caseData;
             
             // Add debounce timer for duplicate checking
             const [duplicateCheckTimer, setDuplicateCheckTimer] = useState(null);
@@ -652,18 +686,19 @@
                 onTempSave(index);
             };
 
-            const cardBorderColor = isModified ? 'border-blue-500' : 'border-gray-200';
-            const activeShadow = isActive ? 'shadow-xl' : 'shadow-md';
-            const hasSharePointId = sharePointId !== null && sharePointId !== undefined;
+            // Safe computed values with explicit fallbacks
+            const cardBorderColor = (isModified === true) ? 'border-blue-500' : 'border-gray-200';
+            const activeShadow = (isActive === true) ? 'shadow-xl' : 'shadow-md';
+            const hasSharePointId = sharePointId !== null && sharePointId !== undefined && sharePointId !== '';
 
             return html`
                 <div 
-                    id=${`case-card-${index}`}
+                    id=${`case-card-${index || 0}`}
                     class="bg-white p-6 rounded-lg border-l-4 ${cardBorderColor} ${activeShadow} transition-all duration-300 mb-4"
                 >
                     <div class="flex justify-between items-center mb-4">
                         <div class="flex items-center space-x-3">
-                            <h3 class="text-xl font-bold text-gray-700">Zaak #${index + 1}</h3>
+                            <h3 class="text-xl font-bold text-gray-700">Zaak #${(index || 0) + 1}</h3>
                             ${hasSharePointId && html`
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -854,8 +889,8 @@
                                         onFocus=${handleFocus}
                                         class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                                     >
-                                        ${STATUS_CHOICES.map(choice => html`
-                                            <option value=${choice} ...${ status === choice ? { selected: true } : {} }>${choice}</option>
+                                        ${(STATUS_CHOICES || []).map(choice => html`
+                                            <option value=${choice || ''} ...${ status === choice ? { selected: true } : {} }>${choice || ''}</option>
                                         `)}
                                     </select>
                                 </div>
@@ -2048,23 +2083,26 @@
                     <!-- Main Content -->
                     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
                         <div class="max-w-6xl mx-auto">
-                            ${cases.map((caseItem, index) => html`
-                                <${CaseCard}
-                                    key=${caseItem.id}
-                                    caseData=${caseItem}
-                                    index=${index}
-                                    onUpdate=${handleUpdateCase}
-                                    onFocus=${handleFocusCase}
-                                    onSaveIndividual=${handleSaveIndividual}
-                                    onTempSave=${handleTempSave}
-                                    connectionStatus=${connectionStatus}
-                                    useGlobalGesprokenMet=${useGlobalGesprokenMet}
-                                    isActive=${index === activeCaseIndex}
-                                    handleIndividualTempSave=${handleIndividualTempSave}
-                                    handleIndividualPrepareForDocGen=${handleIndividualPrepareForDocGen}
-                                    handleIndividualFinalize=${handleIndividualFinalize}
-                                />
-                            `)}
+                            ${(cases || []).map((caseItem, index) => {
+                                if (!caseItem || typeof index !== 'number') return null;
+                                return html`
+                                    <${CaseCard}
+                                        key=${caseItem.id || `case-${index}`}
+                                        caseData=${caseItem}
+                                        index=${index}
+                                        onUpdate=${handleUpdateCase}
+                                        onFocus=${handleFocusCase}
+                                        onSaveIndividual=${handleSaveIndividual}
+                                        onTempSave=${handleTempSave}
+                                        connectionStatus=${connectionStatus}
+                                        useGlobalGesprokenMet=${useGlobalGesprokenMet}
+                                        isActive=${index === activeCaseIndex}
+                                        handleIndividualTempSave=${handleIndividualTempSave}
+                                        handleIndividualPrepareForDocGen=${handleIndividualPrepareForDocGen}
+                                        handleIndividualFinalize=${handleIndividualFinalize}
+                                    />
+                                `;
+                            }).filter(Boolean)}
                         </div>
                     </main>
                     
