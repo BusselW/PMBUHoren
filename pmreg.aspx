@@ -206,6 +206,8 @@
                 return {
                     Title: caseData.zaaknummer || '',
                     Feitcode: caseData.feitcode || '',
+                    CJIBNummer: caseData.cjibNummer || '',
+                    CJIBLast4: caseData.cjibLast4 || '',
                     Feitomschrijving: caseData.feitomschrijving || '',
                     Vooronderzoek: caseData.vooronderzoek || '',
                     ReactiePMBU: caseData.reactie || '',
@@ -797,6 +799,20 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-3">
+                                    <input
+                                        type="file"
+                                        accept=".xlsx,.xls"
+                                        onChange=${handleExcelImport}
+                                        style="display: none;"
+                                        id="excel-import"
+                                    />
+                                    <button
+                                        onClick=${() => document.getElementById('excel-import').click()}
+                                        disabled=${isLoading || connectionStatus !== 'success'}
+                                        class="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Excel Import
+                                    </button>
                                     <button
                                         onClick=${handleSaveAll}
                                         disabled=${isLoading || connectionStatus !== 'success'}
