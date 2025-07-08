@@ -58,6 +58,18 @@ export const FIELD_CONFIG = [
         description: 'Aantekeningen betreffende het hoorverzoek.'
     },
     {
+        displayName: 'Verslaglegger',
+        internalName: 'Verslaglegger',
+        fieldType: 'Text',
+        description: 'De naam van de persoon die het verslag opstelt.'
+    },
+    {
+        displayName: 'Gesproken Met',
+        internalName: 'GesprokenMet',
+        fieldType: 'Text',
+        description: 'Met wie er is gesproken tijdens de hoorzitting.'
+    },
+    {
         displayName: 'Feitomschrijving',
         internalName: 'Feitomschrijving',
         fieldType: 'Note',

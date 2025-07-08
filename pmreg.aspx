@@ -321,6 +321,8 @@
                     HearingDate: caseData.hearingDate || null,
                     StartTime: caseData.startTime || '',
                     EndTime: caseData.endTime || '',
+                    Verslaglegger: caseData.verslaglegger || '',
+                    GesprokenMet: caseData.gesprokenMet || '',
                     Status: caseData.status || 'Bezig met uitwerken'
                 };
             }
@@ -347,6 +349,8 @@
                 hearingDate: new Date().toISOString().split('T')[0], // Today's date
                 startTime: '',
                 endTime: '',
+                verslaglegger: '',
+                gesprokenMet: '',
                 status: 'Bezig met uitwerken', // Matches SharePoint exactly
                 isModified: false,
             }));
@@ -354,8 +358,8 @@
 
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
-        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus }) => {
-            const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, betrokkene, eigenaar, soort, aantekeninghoorverzoek, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, status, isModified, sharePointId } = caseData;
+        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus, useGlobalVerslaglegger }) => {
+            const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, betrokkene, eigenaar, soort, aantekeninghoorverzoek, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, verslaglegger, gesprokenMet, status, isModified, sharePointId } = caseData;
 
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
@@ -414,225 +418,288 @@
                             </button>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <!-- Zaaknummer -->
-                        <div class="flex flex-col">
-                            <label for=${`zaaknummer-${id}`} class="mb-1 font-semibold text-gray-600">Zaaknummer</label>
-                            <input
-                                type="text"
-                                id=${`zaaknummer-${id}`}
-                                name="zaaknummer"
-                                value=${zaaknummer}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="bv. 123456789"
-                            />
+                    <div class="grid grid-cols-1 gap-6">
+                        <!-- Group 1: Basic Case Information -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Zaak Informatie</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Zaaknummer -->
+                                <div class="flex flex-col">
+                                    <label for=${`zaaknummer-${id}`} class="mb-1 font-semibold text-gray-600">Zaaknummer</label>
+                                    <input
+                                        type="text"
+                                        id=${`zaaknummer-${id}`}
+                                        name="zaaknummer"
+                                        value=${zaaknummer}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                        placeholder="bv. 123456789"
+                                    />
+                                </div>
+
+                                <!-- CJIB Nummer -->
+                                <div class="flex flex-col">
+                                    <label for=${`cjibNummer-${id}`} class="mb-1 font-semibold text-gray-600">CJIB Nummer</label>
+                                    <input
+                                        type="text"
+                                        id=${`cjibNummer-${id}`}
+                                        name="cjibNummer"
+                                        value=${cjibNummer}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                        placeholder="Volledig CJIB nummer"
+                                    />
+                                </div>
+
+                                <!-- CJIB Laatste 4 (Read-only) -->
+                                <div class="flex flex-col">
+                                    <label for=${`cjibLast4-${id}`} class="mb-1 font-semibold text-gray-600">CJIB Laatste 4</label>
+                                    <input
+                                        type="text"
+                                        id=${`cjibLast4-${id}`}
+                                        name="cjibLast4"
+                                        value=${cjibLast4}
+                                        readonly
+                                        class="p-3 border border-gray-300 rounded-md bg-gray-50 text-gray-600 outline-none"
+                                        placeholder="Auto"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Feitcode -->
-                        <div class="flex flex-col">
-                            <label for=${`feitcode-${id}`} class="mb-1 font-semibold text-gray-600">Feitcode</label>
-                            <input
-                                type="text"
-                                id=${`feitcode-${id}`}
-                                name="feitcode"
-                                value=${feitcode}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="bv. R584"
-                            />
+                        <!-- Group 2: Party Information -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Betrokkenen</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Betrokkene -->
+                                <div class="flex flex-col">
+                                    <label for=${`betrokkene-${id}`} class="mb-1 font-semibold text-gray-600">Betrokkene</label>
+                                    <input
+                                        type="text"
+                                        id=${`betrokkene-${id}`}
+                                        name="betrokkene"
+                                        value=${betrokkene}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                        placeholder="Naam van de betrokkene"
+                                    />
+                                </div>
+
+                                <!-- Eigenaar -->
+                                <div class="flex flex-col">
+                                    <label for=${`eigenaar-${id}`} class="mb-1 font-semibold text-gray-600">Eigenaar</label>
+                                    <input
+                                        type="text"
+                                        id=${`eigenaar-${id}`}
+                                        name="eigenaar"
+                                        value=${eigenaar}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                        placeholder="Naam van de eigenaar"
+                                    />
+                                </div>
+
+                                <!-- Soort -->
+                                <div class="flex flex-col">
+                                    <label for=${`soort-${id}`} class="mb-1 font-semibold text-gray-600">Soort</label>
+                                    <input
+                                        type="text"
+                                        id=${`soort-${id}`}
+                                        name="soort"
+                                        value=${soort}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                        placeholder="Soort zaak/overtreding"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- CJIB Nummer -->
-                        <div class="flex flex-col">
-                            <label for=${`cjibNummer-${id}`} class="mb-1 font-semibold text-gray-600">CJIB Nummer</label>
-                            <input
-                                type="text"
-                                id=${`cjibNummer-${id}`}
-                                name="cjibNummer"
-                                value=${cjibNummer}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="Volledig CJIB nummer"
-                            />
+                        <!-- Group 3: Timing Information -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Tijd en Datum</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Datum Hoorzitting -->
+                                <div class="flex flex-col">
+                                    <label for=${`hearingDate-${id}`} class="mb-1 font-semibold text-gray-600">Datum Hoorzitting</label>
+                                    <input
+                                        type="date"
+                                        id=${`hearingDate-${id}`}
+                                        name="hearingDate"
+                                        value=${hearingDate}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                    />
+                                </div>
+
+                                <!-- Starttijd -->
+                                <div class="flex flex-col">
+                                    <label for=${`startTime-${id}`} class="mb-1 font-semibold text-gray-600">Starttijd</label>
+                                    <input
+                                        type="time"
+                                        id=${`startTime-${id}`}
+                                        name="startTime"
+                                        value=${startTime}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                    />
+                                </div>
+
+                                <!-- Eindtijd -->
+                                <div class="flex flex-col">
+                                    <label for=${`endTime-${id}`} class="mb-1 font-semibold text-gray-600">Eindtijd</label>
+                                    <input
+                                        type="time"
+                                        id=${`endTime-${id}`}
+                                        name="endTime"
+                                        value=${endTime}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- CJIB Laatste 4 (Read-only) -->
-                        <div class="flex flex-col">
-                            <label for=${`cjibLast4-${id}`} class="mb-1 font-semibold text-gray-600">CJIB Laatste 4</label>
-                            <input
-                                type="text"
-                                id=${`cjibLast4-${id}`}
-                                name="cjibLast4"
-                                value=${cjibLast4}
-                                readonly
-                                class="p-3 border border-gray-300 rounded-md bg-gray-50 text-gray-600 outline-none"
-                                placeholder="Auto"
-                            />
+                        <!-- Group 4: Violation Information -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Overtreding Details</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Feitcode -->
+                                <div class="flex flex-col">
+                                    <label for=${`feitcode-${id}`} class="mb-1 font-semibold text-gray-600">Feitcode</label>
+                                    <input
+                                        type="text"
+                                        id=${`feitcode-${id}`}
+                                        name="feitcode"
+                                        value=${feitcode}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                        placeholder="bv. R584"
+                                    />
+                                </div>
+
+                                <!-- Status -->
+                                <div class="flex flex-col">
+                                    <label for=${`status-${id}`} class="mb-1 font-semibold text-gray-600">Status</label>
+                                    <select
+                                        id=${`status-${id}`}
+                                        name="status"
+                                        value=${status}
+                                        onChange=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                    >
+                                        ${STATUS_CHOICES.map(choice => html`
+                                            <option value=${choice} selected=${status === choice}>${choice}</option>
+                                        `)}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Feitomschrijving (full width) -->
+                            <div class="mt-4 flex flex-col">
+                                <label for=${`feitomschrijving-${id}`} class="mb-1 font-semibold text-gray-600">Feitomschrijving</label>
+                                <input
+                                    type="text"
+                                    id=${`feitomschrijving-${id}`}
+                                    name="feitomschrijving"
+                                    value=${feitomschrijving}
+                                    onInput=${handleInputChange}
+                                    onFocus=${handleFocus}
+                                    class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                    placeholder="Omschrijving van de overtreding"
+                                />
+                            </div>
                         </div>
 
-                        <!-- Betrokkene -->
-                        <div class="flex flex-col">
-                            <label for=${`betrokkene-${id}`} class="mb-1 font-semibold text-gray-600">Betrokkene</label>
-                            <input
-                                type="text"
-                                id=${`betrokkene-${id}`}
-                                name="betrokkene"
-                                value=${betrokkene}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="Naam van de betrokkene"
-                            />
-                        </div>
+                        <!-- Group 5: Investigation & Communication -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Onderzoek en Communicatie</h4>
+                            
+                            <!-- Vooronderzoek -->
+                            <div class="mb-4 flex flex-col">
+                                <label for=${`vooronderzoek-${id}`} class="mb-1 font-semibold text-gray-600">Vooronderzoek</label>
+                                <textarea
+                                    id=${`vooronderzoek-${id}`}
+                                    name="vooronderzoek"
+                                    value=${vooronderzoek}
+                                    onInput=${handleInputChange}
+                                    onFocus=${handleFocus}
+                                    class="p-3 border border-gray-300 rounded-md h-24 resize-y focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                    placeholder="Resultaten van het vooronderzoek..."
+                                ></textarea>
+                            </div>
 
-                        <!-- Eigenaar -->
-                        <div class="flex flex-col">
-                            <label for=${`eigenaar-${id}`} class="mb-1 font-semibold text-gray-600">Eigenaar</label>
-                            <input
-                                type="text"
-                                id=${`eigenaar-${id}`}
-                                name="eigenaar"
-                                value=${eigenaar}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="Naam van de eigenaar"
-                            />
-                        </div>
+                            <!-- Gesproken Met (conditional) -->
+                            ${!useGlobalVerslaglegger && html`
+                                <div class="mb-4 flex flex-col">
+                                    <label for=${`gesprokenMet-${id}`} class="mb-1 font-semibold text-gray-600">Gesproken Met</label>
+                                    <input
+                                        type="text"
+                                        id=${`gesprokenMet-${id}`}
+                                        name="gesprokenMet"
+                                        value=${gesprokenMet}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                        placeholder="Met wie is er gesproken?"
+                                    />
+                                </div>
+                            `}
 
-                        <!-- Soort -->
-                        <div class="flex flex-col">
-                            <label for=${`soort-${id}`} class="mb-1 font-semibold text-gray-600">Soort</label>
-                            <input
-                                type="text"
-                                id=${`soort-${id}`}
-                                name="soort"
-                                value=${soort}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="Soort zaak/overtreding"
-                            />
-                        </div>
+                            <!-- Verslaglegger (conditional) -->
+                            ${!useGlobalVerslaglegger && html`
+                                <div class="mb-4 flex flex-col">
+                                    <label for=${`verslaglegger-${id}`} class="mb-1 font-semibold text-gray-600">Verslaglegger</label>
+                                    <input
+                                        type="text"
+                                        id=${`verslaglegger-${id}`}
+                                        name="verslaglegger"
+                                        value=${verslaglegger}
+                                        onInput=${handleInputChange}
+                                        onFocus=${handleFocus}
+                                        class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                        placeholder="Naam van de verslaglegger"
+                                    />
+                                </div>
+                            `}
 
-                        <!-- Status -->
-                        <div class="flex flex-col">
-                            <label for=${`status-${id}`} class="mb-1 font-semibold text-gray-600">Status</label>
-                            <select
-                                id=${`status-${id}`}
-                                name="status"
-                                value=${status}
-                                onChange=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                            >
-                                ${STATUS_CHOICES.map(choice => html`
-                                    <option value=${choice} selected=${status === choice}>${choice}</option>
-                                `)}
-                            </select>
-                        </div>
+                            <!-- Reactie burger/gemachtigde -->
+                            <div class="mb-4 flex flex-col">
+                                <label for=${`reactie-${id}`} class="mb-1 font-semibold text-gray-600">Reactie burger/gemachtigde</label>
+                                <textarea
+                                    id=${`reactie-${id}`}
+                                    name="reactie"
+                                    value=${reactie}
+                                    onInput=${handleInputChange}
+                                    onFocus=${handleFocus}
+                                    class="p-3 border border-gray-300 rounded-md h-32 resize-y focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                    placeholder="Noteer hier het gesprek..."
+                                ></textarea>
+                            </div>
 
-                        <!-- Datum Hoorzitting -->
-                        <div class="flex flex-col">
-                            <label for=${`hearingDate-${id}`} class="mb-1 font-semibold text-gray-600">Datum Hoorzitting</label>
-                            <input
-                                type="date"
-                                id=${`hearingDate-${id}`}
-                                name="hearingDate"
-                                value=${hearingDate}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                            />
-                        </div>
-
-                        <!-- Starttijd -->
-                        <div class="flex flex-col">
-                            <label for=${`startTime-${id}`} class="mb-1 font-semibold text-gray-600">Starttijd</label>
-                            <input
-                                type="time"
-                                id=${`startTime-${id}`}
-                                name="startTime"
-                                value=${startTime}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                            />
-                        </div>
-
-                        <!-- Eindtijd -->
-                        <div class="flex flex-col">
-                            <label for=${`endTime-${id}`} class="mb-1 font-semibold text-gray-600">Eindtijd</label>
-                            <input
-                                type="time"
-                                id=${`endTime-${id}`}
-                                name="endTime"
-                                value=${endTime}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                            />
-                        </div>
-
-                        <!-- Feitomschrijving -->
-                        <div class="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col">
-                            <label for=${`feitomschrijving-${id}`} class="mb-1 font-semibold text-gray-600">Feitomschrijving</label>
-                            <input
-                                type="text"
-                                id=${`feitomschrijving-${id}`}
-                                name="feitomschrijving"
-                                value=${feitomschrijving}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="Omschrijving van de overtreding"
-                            />
-                        </div>
-                        
-                        <!-- Vooronderzoek -->
-                        <div class="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col">
-                            <label for=${`vooronderzoek-${id}`} class="mb-1 font-semibold text-gray-600">Vooronderzoek</label>
-                            <textarea
-                                id=${`vooronderzoek-${id}`}
-                                name="vooronderzoek"
-                                value=${vooronderzoek}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md h-24 resize-y focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="Resultaten van het vooronderzoek..."
-                            ></textarea>
-                        </div>
-
-                        <!-- Reactie burger/gemachtigde -->
-                        <div class="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col">
-                            <label for=${`reactie-${id}`} class="mb-1 font-semibold text-gray-600">Reactie burger/gemachtigde</label>
-                            <textarea
-                                id=${`reactie-${id}`}
-                                name="reactie"
-                                value=${reactie}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md h-32 resize-y focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="Noteer hier het gesprek..."
-                            ></textarea>
-                        </div>
-
-                        <!-- Aantekening Hoorverzoek -->
-                        <div class="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col">
-                            <label for=${`aantekeninghoorverzoek-${id}`} class="mb-1 font-semibold text-gray-600">Aantekening Hoorverzoek</label>
-                            <textarea
-                                id=${`aantekeninghoorverzoek-${id}`}
-                                name="aantekeninghoorverzoek"
-                                value=${aantekeninghoorverzoek}
-                                onInput=${handleInputChange}
-                                onFocus=${handleFocus}
-                                class="p-3 border border-gray-300 rounded-md h-24 resize-y focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                placeholder="Aantekeningen betreffende het hoorverzoek..."
-                            ></textarea>
+                            <!-- Aantekening Hoorverzoek -->
+                            <div class="flex flex-col">
+                                <label for=${`aantekeninghoorverzoek-${id}`} class="mb-1 font-semibold text-gray-600">Aantekening Hoorverzoek</label>
+                                <textarea
+                                    id=${`aantekeninghoorverzoek-${id}`}
+                                    name="aantekeninghoorverzoek"
+                                    value=${aantekeninghoorverzoek}
+                                    onInput=${handleInputChange}
+                                    onFocus=${handleFocus}
+                                    class="p-3 border border-gray-300 rounded-md h-24 resize-y focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                    placeholder="Aantekeningen betreffende het hoorverzoek..."
+                                ></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -652,6 +719,8 @@
             const [showDateMenu, setShowDateMenu] = useState(false);
             const [availableDates, setAvailableDates] = useState([]);
             const [loadingDates, setLoadingDates] = useState(false);
+            const [globalVerslaglegger, setGlobalVerslaglegger] = useState('');
+            const [useGlobalVerslaglegger, setUseGlobalVerslaglegger] = useState(true);
 
             // Test SharePoint connection on load
             useEffect(() => {
@@ -793,6 +862,8 @@
                                 hearingDate: date || new Date().toISOString().split('T')[0],
                                 startTime: startTime,
                                 endTime: endTime,
+                                verslaglegger: findColumnValue(row, ['Verslaglegger', 'verslaglegger']),
+                                gesprokenMet: '',
                                 status: 'Bezig met uitwerken',
                                 isModified: true,
                             };
@@ -818,6 +889,8 @@
                                 hearingDate: new Date().toISOString().split('T')[0],
                                 startTime: '',
                                 endTime: '',
+                                verslaglegger: '',
+                                gesprokenMet: '',
                                 status: 'Bezig met uitwerken',
                                 isModified: false,
                             });
@@ -851,7 +924,13 @@
                 setIsLoading(true);
                 
                 try {
-                    const sharePointData = sharePointService.transformCaseToSharePoint(caseData);
+                    // Apply global verslaglegger if enabled
+                    const finalCaseData = {
+                        ...caseData,
+                        verslaglegger: useGlobalVerslaglegger ? globalVerslaglegger : caseData.verslaglegger
+                    };
+                    
+                    const sharePointData = sharePointService.transformCaseToSharePoint(finalCaseData);
                     
                     let result;
                     if (caseData.sharePointId) {
@@ -862,7 +941,7 @@
                         result = await sharePointService.createItem(sharePointData);
                         
                         // Update the case with the SharePoint ID
-                        const updatedCase = { ...caseData, sharePointId: result.Id, isModified: false };
+                        const updatedCase = { ...finalCaseData, sharePointId: result.Id, isModified: false };
                         handleUpdateCase(index, updatedCase);
                     }
                     
@@ -901,7 +980,13 @@
                 setIsLoading(true);
                 
                 try {
-                    const sharePointData = sharePointService.transformCaseToSharePoint(caseData);
+                    // Apply global verslaglegger if enabled
+                    const finalCaseData = {
+                        ...caseData,
+                        verslaglegger: useGlobalVerslaglegger ? globalVerslaglegger : caseData.verslaglegger
+                    };
+                    
+                    const sharePointData = sharePointService.transformCaseToSharePoint(finalCaseData);
                     
                     // Add temporary status flag to indicate this is a work-in-progress update
                     const tempData = {
@@ -912,7 +997,7 @@
                     await sharePointService.updateItem(caseData.sharePointId, tempData);
                     
                     // Update local state to reflect saved changes
-                    const updatedCase = { ...caseData, isModified: false, status: 'Bezig met uitwerken' };
+                    const updatedCase = { ...finalCaseData, isModified: false, status: 'Bezig met uitwerken' };
                     handleUpdateCase(index, updatedCase);
                     
                     setModalContent({
@@ -946,7 +1031,13 @@
                         // Only save cases that have some data or are modified
                         if (caseData.isModified || caseData.zaaknummer || caseData.feitcode || caseData.reactie) {
                             try {
-                                const sharePointData = sharePointService.transformCaseToSharePoint(caseData);
+                                // Apply global verslaglegger if enabled
+                                const finalCaseData = {
+                                    ...caseData,
+                                    verslaglegger: useGlobalVerslaglegger ? globalVerslaglegger : caseData.verslaglegger
+                                };
+                                
+                                const sharePointData = sharePointService.transformCaseToSharePoint(finalCaseData);
                                 
                                 let result;
                                 if (caseData.sharePointId) {
@@ -955,7 +1046,7 @@
                                 } else {
                                     result = await sharePointService.createItem(sharePointData);
                                     // Update the case with the SharePoint ID
-                                    const updatedCase = { ...caseData, sharePointId: result.Id, isModified: false };
+                                    const updatedCase = { ...finalCaseData, sharePointId: result.Id, isModified: false };
                                     handleUpdateCase(i, updatedCase);
                                     successes.push(`Zaak #${i + 1} aangemaakt`);
                                 }
@@ -1061,6 +1152,8 @@
                         hearingDate: spCase.HearingDate ? new Date(spCase.HearingDate).toISOString().split('T')[0] : '',
                         startTime: spCase.StartTime || '',
                         endTime: spCase.EndTime || '',
+                        verslaglegger: spCase.Verslaglegger || '',
+                        gesprokenMet: spCase.GesprokenMet || '',
                         status: spCase.Status || 'Bezig met uitwerken',
                         isModified: false,
                     }));
@@ -1085,6 +1178,8 @@
                             hearingDate: selectedDate,
                             startTime: '',
                             endTime: '',
+                            verslaglegger: '',
+                            gesprokenMet: '',
                             status: 'Bezig met uitwerken',
                             isModified: false,
                         });
@@ -1126,6 +1221,7 @@
                     
                     <!-- Header -->
                     <header class="bg-white shadow-sm sticky top-0 z-20">
+                        <!-- Main Header Row -->
                         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
                             <div class="flex flex-wrap justify-between items-center gap-4">
                                 <div class="flex items-center space-x-4">
@@ -1247,6 +1343,53 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Verslaglegger Controls -->
+                        <div class="border-t border-gray-200 bg-gray-50">
+                            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                                <div class="flex flex-wrap items-center justify-between gap-4">
+                                    <!-- Toggle Switch for Global Verslaglegger -->
+                                    <div class="flex items-center space-x-3">
+                                        <label class="text-sm font-medium text-gray-700">Gesproken Met:</label>
+                                        <div class="relative inline-block w-12 h-6">
+                                            <input
+                                                type="checkbox"
+                                                id="verslaglegger-toggle"
+                                                checked=${useGlobalVerslaglegger}
+                                                onChange=${(e) => setUseGlobalVerslaglegger(e.target.checked)}
+                                                class="sr-only"
+                                            />
+                                            <label
+                                                for="verslaglegger-toggle"
+                                                class=${`block w-12 h-6 rounded-full cursor-pointer transition-colors duration-300 ${useGlobalVerslaglegger ? 'bg-blue-600' : 'bg-gray-300'}`}
+                                            >
+                                                <span
+                                                    class=${`block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 mt-1 ${useGlobalVerslaglegger ? 'translate-x-7' : 'translate-x-1'}`}
+                                                ></span>
+                                            </label>
+                                        </div>
+                                        <span class="text-sm text-gray-600">
+                                            ${useGlobalVerslaglegger ? 'Globaal voor alle zaken' : 'Per zaak individueel'}
+                                        </span>
+                                    </div>
+                                    
+                                    <!-- Global Verslaglegger Input (only shown when toggle is ON) -->
+                                    ${useGlobalVerslaglegger && html`
+                                        <div class="flex items-center space-x-3">
+                                            <label for="global-verslaglegger" class="text-sm font-medium text-gray-700">Verslaglegger:</label>
+                                            <input
+                                                type="text"
+                                                id="global-verslaglegger"
+                                                value=${globalVerslaglegger}
+                                                onInput=${(e) => setGlobalVerslaglegger(e.target.value)}
+                                                class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition w-64"
+                                                placeholder="Naam van de verslaglegger"
+                                            />
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
                     </header>
 
                     <!-- Main Content -->
@@ -1262,6 +1405,7 @@
                                     onSaveIndividual=${handleSaveIndividual}
                                     onTempSave=${handleTempSave}
                                     connectionStatus=${connectionStatus}
+                                    useGlobalVerslaglegger=${useGlobalVerslaglegger}
                                     isActive=${index === activeCaseIndex}
                                 />
                             `)}
