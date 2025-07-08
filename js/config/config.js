@@ -22,6 +22,18 @@ export const FIELD_CONFIG = [
         description: 'De code die correspondeert met de overtreding.'
     },
     {
+        displayName: 'CJIB Nummer',
+        internalName: 'CJIBNummer',
+        fieldType: 'Text',
+        description: 'Het volledige CJIB nummer van de zaak.'
+    },
+    {
+        displayName: 'CJIB Laatste 4',
+        internalName: 'CJIBLast4',
+        fieldType: 'Text',
+        description: 'De laatste 4 cijfers van het CJIB nummer (automatisch gegenereerd).'
+    },
+    {
         displayName: 'Feitomschrijving',
         internalName: 'Feitomschrijving',
         fieldType: 'Note',

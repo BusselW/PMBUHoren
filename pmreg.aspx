@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hoorzitting Notulen Logger</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Preact and HTM for JSX-less React -->
     <script type="module">
         // Corrected imports from a more reliable ES Module CDN (esm.sh)
@@ -225,6 +226,8 @@
                 sharePointId: null,
                 zaaknummer: '',
                 feitcode: '',
+                cjibNummer: '',
+                cjibLast4: '',
                 feitomschrijving: '',
                 vooronderzoek: '',
                 reactie: '',
@@ -239,11 +242,19 @@
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
         const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus }) => {
-            const { id, zaaknummer, feitcode, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, status, isModified, sharePointId } = caseData;
+            const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, status, isModified, sharePointId } = caseData;
 
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
-                onUpdate(index, { ...caseData, [name]: value, isModified: true });
+                let updatedData = { ...caseData, [name]: value, isModified: true };
+                
+                // Auto-generate CJIB Last 4 when CJIB number changes
+                if (name === 'cjibNummer') {
+                    const last4 = value.slice(-4);
+                    updatedData.cjibLast4 = last4;
+                }
+                
+                onUpdate(index, updatedData);
             };
 
             const handleFocus = () => {
@@ -318,6 +329,35 @@
                                 onFocus=${handleFocus}
                                 class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                                 placeholder="bv. R584"
+                            />
+                        </div>
+
+                        <!-- CJIB Nummer -->
+                        <div class="flex flex-col">
+                            <label for=${`cjibNummer-${id}`} class="mb-1 font-semibold text-gray-600">CJIB Nummer</label>
+                            <input
+                                type="text"
+                                id=${`cjibNummer-${id}`}
+                                name="cjibNummer"
+                                value=${cjibNummer}
+                                onInput=${handleInputChange}
+                                onFocus=${handleFocus}
+                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                placeholder="Volledig CJIB nummer"
+                            />
+                        </div>
+
+                        <!-- CJIB Laatste 4 (Read-only) -->
+                        <div class="flex flex-col">
+                            <label for=${`cjibLast4-${id}`} class="mb-1 font-semibold text-gray-600">CJIB Laatste 4</label>
+                            <input
+                                type="text"
+                                id=${`cjibLast4-${id}`}
+                                name="cjibLast4"
+                                value=${cjibLast4}
+                                readonly
+                                class="p-3 border border-gray-300 rounded-md bg-gray-50 text-gray-600 outline-none"
+                                placeholder="Auto"
                             />
                         </div>
 
@@ -478,6 +518,81 @@
             const handleFocusCase = useCallback((index) => {
                 setActiveCaseIndex(index);
             }, []);
+
+            // Excel Import Function
+            const handleExcelImport = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                        // Map Excel data to our case format
+                        const importedCases = jsonData.slice(0, 20).map((row, index) => ({
+                            id: `case-${index}`,
+                            sharePointId: null,
+                            zaaknummer: row.Registratienummer || row.zaaknummer || '',
+                            feitcode: row.Feitcode || row.feitcode || '',
+                            cjibNummer: row.CJIBNummer || row.cjibNummer || '',
+                            cjibLast4: (row.CJIBNummer || row.cjibNummer || '').slice(-4),
+                            feitomschrijving: row.Feitomschrijving || row.feitomschrijving || '',
+                            vooronderzoek: '',
+                            reactie: '',
+                            hearingDate: new Date().toISOString().split('T')[0],
+                            startTime: '',
+                            endTime: '',
+                            status: 'Bezig met uitwerken',
+                            isModified: true,
+                        }));
+
+                        // Fill remaining slots with empty cases
+                        while (importedCases.length < 20) {
+                            const index = importedCases.length;
+                            importedCases.push({
+                                id: `case-${index}`,
+                                sharePointId: null,
+                                zaaknummer: '',
+                                feitcode: '',
+                                cjibNummer: '',
+                                cjibLast4: '',
+                                feitomschrijving: '',
+                                vooronderzoek: '',
+                                reactie: '',
+                                hearingDate: new Date().toISOString().split('T')[0],
+                                startTime: '',
+                                endTime: '',
+                                status: 'Bezig met uitwerken',
+                                isModified: false,
+                            });
+                        }
+
+                        setCases(importedCases);
+                        setModalContent({
+                            title: 'Excel Import Voltooid',
+                            message: `${Math.min(jsonData.length, 20)} zaken zijn geïmporteerd uit het Excel bestand.`
+                        });
+                        setShowInfoModal(true);
+
+                    } catch (error) {
+                        console.error('Error importing Excel:', error);
+                        setModalContent({
+                            title: 'Import Fout',
+                            message: `Er is een fout opgetreden bij het importeren: ${error.message}`
+                        });
+                        setShowInfoModal(true);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+                
+                // Reset file input
+                event.target.value = '';
+            };
 
             // Save individual case to SharePoint
             const handleSaveIndividual = async (index) => {
