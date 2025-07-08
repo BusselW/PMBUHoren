@@ -226,6 +226,10 @@
                     Feitcode: caseData.feitcode || '',
                     CJIBNummer: caseData.cjibNummer || '', // CJIB Number field - must exist in SharePoint
                     // CJIBLast4: caseData.cjibLast4 || '',   // Excluded: Display-only field (last 4 digits of CJIBNummer)
+                    Betrokkene: caseData.betrokkene || '',
+                    Eigenaar: caseData.eigenaar || '',
+                    Soort: caseData.soort || '',
+                    AantekeningHoorverzoek: caseData.aantekeninghoorverzoek || '',
                     Feitomschrijving: caseData.feitomschrijving || '',
                     Vooronderzoek: caseData.vooronderzoek || '',
                     ReactiePMBU: caseData.reactie || '',
@@ -248,6 +252,10 @@
                 feitcode: '',
                 cjibNummer: '',
                 cjibLast4: '',
+                betrokkene: '',
+                eigenaar: '',
+                soort: '',
+                aantekeninghoorverzoek: '',
                 feitomschrijving: '',
                 vooronderzoek: '',
                 reactie: '',
@@ -262,7 +270,7 @@
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
         const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus }) => {
-            const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, status, isModified, sharePointId } = caseData;
+            const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, betrokkene, eigenaar, soort, aantekeninghoorverzoek, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, status, isModified, sharePointId } = caseData;
 
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
@@ -381,6 +389,51 @@
                             />
                         </div>
 
+                        <!-- Betrokkene -->
+                        <div class="flex flex-col">
+                            <label for=${`betrokkene-${id}`} class="mb-1 font-semibold text-gray-600">Betrokkene</label>
+                            <input
+                                type="text"
+                                id=${`betrokkene-${id}`}
+                                name="betrokkene"
+                                value=${betrokkene}
+                                onInput=${handleInputChange}
+                                onFocus=${handleFocus}
+                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                placeholder="Naam van de betrokkene"
+                            />
+                        </div>
+
+                        <!-- Eigenaar -->
+                        <div class="flex flex-col">
+                            <label for=${`eigenaar-${id}`} class="mb-1 font-semibold text-gray-600">Eigenaar</label>
+                            <input
+                                type="text"
+                                id=${`eigenaar-${id}`}
+                                name="eigenaar"
+                                value=${eigenaar}
+                                onInput=${handleInputChange}
+                                onFocus=${handleFocus}
+                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                placeholder="Naam van de eigenaar"
+                            />
+                        </div>
+
+                        <!-- Soort -->
+                        <div class="flex flex-col">
+                            <label for=${`soort-${id}`} class="mb-1 font-semibold text-gray-600">Soort</label>
+                            <input
+                                type="text"
+                                id=${`soort-${id}`}
+                                name="soort"
+                                value=${soort}
+                                onInput=${handleInputChange}
+                                onFocus=${handleFocus}
+                                class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                placeholder="Soort zaak/overtreding"
+                            />
+                        </div>
+
                         <!-- Status -->
                         <div class="flex flex-col">
                             <label for=${`status-${id}`} class="mb-1 font-semibold text-gray-600">Status</label>
@@ -482,6 +535,20 @@
                                 placeholder="Noteer hier het gesprek..."
                             ></textarea>
                         </div>
+
+                        <!-- Aantekening Hoorverzoek -->
+                        <div class="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col">
+                            <label for=${`aantekeninghoorverzoek-${id}`} class="mb-1 font-semibold text-gray-600">Aantekening Hoorverzoek</label>
+                            <textarea
+                                id=${`aantekeninghoorverzoek-${id}`}
+                                name="aantekeninghoorverzoek"
+                                value=${aantekeninghoorverzoek}
+                                onInput=${handleInputChange}
+                                onFocus=${handleFocus}
+                                class="p-3 border border-gray-300 rounded-md h-24 resize-y focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                placeholder="Aantekeningen betreffende het hoorverzoek..."
+                            ></textarea>
+                        </div>
                     </div>
                 </div>
             `;
@@ -553,23 +620,81 @@
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+                        // Helper function to find column value case-insensitively
+                        const findColumnValue = (row, possibleNames) => {
+                            for (const name of possibleNames) {
+                                const key = Object.keys(row).find(k => k.toLowerCase() === name.toLowerCase());
+                                if (key && row[key] !== undefined && row[key] !== null && row[key] !== '') {
+                                    return row[key];
+                                }
+                            }
+                            return '';
+                        };
+
+                        // Helper function to parse date and time
+                        const parseDateTimeField = (dateTimeStr) => {
+                            if (!dateTimeStr) return { date: '', startTime: '', endTime: '' };
+                            
+                            try {
+                                // Expected format: dd-mm-yyyy hh:mm
+                                const dateTimeRegex = /^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})$/;
+                                const match = dateTimeStr.toString().match(dateTimeRegex);
+                                
+                                if (match) {
+                                    const [, day, month, year, hours, minutes] = match;
+                                    
+                                    // Format date as YYYY-MM-DD for input[type="date"]
+                                    const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                                    
+                                    // Format start time as HH:MM
+                                    const startTime = `${hours.padStart(2, '0')}:${minutes}`;
+                                    
+                                    // Calculate end time (+4 minutes)
+                                    const startMinutes = parseInt(hours) * 60 + parseInt(minutes);
+                                    const endMinutes = startMinutes + 4;
+                                    const endHours = Math.floor(endMinutes / 60);
+                                    const endMins = endMinutes % 60;
+                                    const endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+                                    
+                                    return { date: formattedDate, startTime, endTime };
+                                }
+                            } catch (error) {
+                                console.warn('Error parsing date/time:', dateTimeStr, error);
+                            }
+                            
+                            return { date: '', startTime: '', endTime: '' };
+                        };
+
                         // Map Excel data to our case format
-                        const importedCases = jsonData.slice(0, 20).map((row, index) => ({
-                            id: `case-${index}`,
-                            sharePointId: null,
-                            zaaknummer: row.Registratienummer || row.zaaknummer || '',
-                            feitcode: row.Feitcode || row.feitcode || '',
-                            cjibNummer: row.CJIBNummer || row.cjibNummer || '',
-                            cjibLast4: (row.CJIBNummer || row.cjibNummer || '').slice(-4),
-                            feitomschrijving: row.Feitomschrijving || row.feitomschrijving || '',
-                            vooronderzoek: row.Vooronderzoek || row.vooronderzoek || '',
-                            reactie: '',
-                            hearingDate: new Date().toISOString().split('T')[0],
-                            startTime: '',
-                            endTime: '',
-                            status: 'Bezig met uitwerken',
-                            isModified: true,
-                        }));
+                        const importedCases = jsonData.slice(0, 20).map((row, index) => {
+                            // Find CJIB number (handle both with and without dash)
+                            const cjibNumber = findColumnValue(row, ['CJIB-Nummer', 'CJIBNummer', 'cjibNummer', 'CJIB Nummer']);
+                            
+                            // Parse date and time from combined field
+                            const dateTimeField = findColumnValue(row, ['Datum en Tijd hoorzitting', 'Datum en tijd hoorzitting', 'Datum_en_Tijd_hoorzitting']);
+                            const { date, startTime, endTime } = parseDateTimeField(dateTimeField);
+
+                            return {
+                                id: `case-${index}`,
+                                sharePointId: null,
+                                zaaknummer: findColumnValue(row, ['Registratienummer', 'zaaknummer', 'Zaaknummer']),
+                                feitcode: findColumnValue(row, ['Feitcode', 'feitcode']),
+                                cjibNummer: cjibNumber,
+                                cjibLast4: cjibNumber ? cjibNumber.toString().slice(-4) : '',
+                                betrokkene: findColumnValue(row, ['Betrokkene', 'betrokkene']),
+                                eigenaar: findColumnValue(row, ['Eigenaar', 'eigenaar']),
+                                soort: findColumnValue(row, ['Soort', 'soort']),
+                                aantekeninghoorverzoek: findColumnValue(row, ['Aantekening hoorverzoek', 'AantekeningHoorverzoek', 'aantekeninghoorverzoek']),
+                                feitomschrijving: '', // Set to blank as requested
+                                vooronderzoek: findColumnValue(row, ['Vooronderzoek', 'vooronderzoek']),
+                                reactie: '',
+                                hearingDate: date || new Date().toISOString().split('T')[0],
+                                startTime: startTime,
+                                endTime: endTime,
+                                status: 'Bezig met uitwerken',
+                                isModified: true,
+                            };
+                        });
 
                         // Fill remaining slots with empty cases
                         while (importedCases.length < 20) {
@@ -581,6 +706,10 @@
                                 feitcode: '',
                                 cjibNummer: '',
                                 cjibLast4: '',
+                                betrokkene: '',
+                                eigenaar: '',
+                                soort: '',
+                                aantekeninghoorverzoek: '',
                                 feitomschrijving: '',
                                 vooronderzoek: '',
                                 reactie: '',

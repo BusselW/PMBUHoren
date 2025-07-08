@@ -34,6 +34,30 @@ export const FIELD_CONFIG = [
         description: 'De laatste 4 cijfers van het CJIB nummer (automatisch gegenereerd).'
     },
     {
+        displayName: 'Betrokkene',
+        internalName: 'Betrokkene',
+        fieldType: 'Text',
+        description: 'De betrokkene bij de zaak.'
+    },
+    {
+        displayName: 'Eigenaar',
+        internalName: 'Eigenaar',
+        fieldType: 'Text',
+        description: 'De eigenaar van het voertuig of object in de zaak.'
+    },
+    {
+        displayName: 'Soort',
+        internalName: 'Soort',
+        fieldType: 'Text',
+        description: 'Het soort zaak of overtreding.'
+    },
+    {
+        displayName: 'Aantekening Hoorverzoek',
+        internalName: 'AantekeningHoorverzoek',
+        fieldType: 'Note',
+        description: 'Aantekeningen betreffende het hoorverzoek.'
+    },
+    {
         displayName: 'Feitomschrijving',
         internalName: 'Feitomschrijving',
         fieldType: 'Note',
