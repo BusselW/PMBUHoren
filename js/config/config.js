@@ -5,6 +5,13 @@ export const SHAREPOINT_CONFIG = {
     apiUrl: 'https://som.org.om.local/sites/MulderT/T/_api/web/',
     contextApiUrl: 'https://som.org.om.local/sites/MulderT/T/_api/', // Separate URL for contextinfo
     listUrl: 'https://som.org.om.local/sites/MulderT/T/PMREG/',
+    
+    // Feitcode lookup configuration
+    feitcodeLookup: {
+        siteUrl: 'https://som.org.om.local/sites/MulderT/SBeheer/',
+        apiUrl: 'https://som.org.om.local/sites/MulderT/SBeheer/_api/web/',
+        listName: 'Feitcode'
+    }
 };
 
 // Field mapping configuration
@@ -19,7 +26,7 @@ export const FIELD_CONFIG = [
         displayName: 'Feitcode',
         internalName: 'Feitcode',
         fieldType: 'Text',
-        description: 'De code die correspondeert met de overtreding.'
+        description: 'De code die correspondeert met de overtreding. Bij invoer wordt automatisch de bijbehorende Feitomschrijving opgehaald.'
     },
     {
         displayName: 'CJIB Nummer',
@@ -79,7 +86,7 @@ export const FIELD_CONFIG = [
         displayName: 'Feitomschrijving',
         internalName: 'Feitomschrijving',
         fieldType: 'Note',
-        description: 'De volledige omschrijving van de overtreding.'
+        description: 'De volledige omschrijving van de overtreding. Wordt automatisch ingevuld op basis van de Feitcode via API lookup naar de Feitcode lijst in SBeheer.'
     },
     {
         displayName: 'Vooronderzoek',
@@ -163,10 +170,33 @@ export const EXCEL_FIELD_MAPPING = {
     
     // Fields always set to defaults during import
     automatic_fields: {
-        'Feitomschrijving': 'Set to blank during import',
+        'Feitomschrijving': 'Auto-filled by Feitcode lookup during import',
         'ReactiePMBU': 'Set to blank during import (reactie)',
         'GesprokenMet': 'Set to blank during import',
         'Status': 'Set to "Nieuw"',
         'CJIBLast4': 'Auto-calculated from CJIBNummer'
+    }
+};
+
+// Feitcode API Integration
+// This section documents the automatic Feitomschrijving lookup functionality
+export const FEITCODE_INTEGRATION = {
+    description: 'Automatic lookup of Feitomschrijving based on Feitcode',
+    source: {
+        site: 'https://som.org.om.local/sites/MulderT/SBeheer/',
+        list: 'Feitcode',
+        fields: ['Feitcode', 'Feitomschrijving']
+    },
+    behavior: {
+        manual_input: 'When user types Feitcode, system automatically looks up and fills Feitomschrijving after 500ms delay',
+        excel_import: 'During Excel import, Feitomschrijving is automatically filled for each row with a valid Feitcode',
+        visual_feedback: 'Loading spinner shows when lookup is in progress',
+        clearing: 'When Feitcode is cleared, Feitomschrijving is also cleared'
+    },
+    api_details: {
+        endpoint: "/_api/web/lists/getbytitle('Feitcode')/items",
+        filter: "Feitcode eq '{feitcode_value}'",
+        method: 'GET',
+        credentials: 'include'
     }
 };

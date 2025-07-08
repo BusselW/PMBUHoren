@@ -27,6 +27,13 @@
             apiUrl: 'https://som.org.om.local/sites/MulderT/T/_api/web/',
             contextApiUrl: 'https://som.org.om.local/sites/MulderT/T/_api/', // Separate URL for contextinfo
             listUrl: 'https://som.org.om.local/sites/MulderT/T/PMREG/',
+            
+            // Feitcode lookup configuration
+            feitcodeLookup: {
+                siteUrl: 'https://som.org.om.local/sites/MulderT/SBeheer/',
+                apiUrl: 'https://som.org.om.local/sites/MulderT/SBeheer/_api/web/',
+                listName: 'Feitcode'
+            }
         };
 
         // Status choices (updated workflow)
@@ -385,6 +392,49 @@
                     Status: caseData.status || 'Bezig met uitwerken'
                 };
             }
+
+            // Method to lookup Feitomschrijving based on Feitcode
+            async getFeitomschrijvingByFeitcode(feitcode) {
+                if (!feitcode || feitcode.trim() === '') {
+                    return '';
+                }
+
+                try {
+                    const lookupConfig = SHAREPOINT_CONFIG.feitcodeLookup;
+                    const filter = `Feitcode eq '${feitcode.trim()}'`;
+                    const apiUrl = `${lookupConfig.apiUrl}lists/getbytitle('${lookupConfig.listName}')/items?$filter=${encodeURIComponent(filter)}&$select=Feitcode,Feitomschrijving`;
+                    
+                    console.log('Fetching Feitomschrijving from:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json;odata=verbose'
+                        },
+                        credentials: 'include'
+                    });
+                    
+                    if (!response.ok) {
+                        console.warn(`HTTP error when fetching Feitomschrijving: ${response.status}`);
+                        return '';
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.d && data.d.results && data.d.results.length > 0) {
+                        const result = data.d.results[0];
+                        console.log('Found Feitomschrijving:', result.Feitomschrijving);
+                        return result.Feitomschrijving || '';
+                    } else {
+                        console.log(`No Feitomschrijving found for Feitcode: ${feitcode}`);
+                        return '';
+                    }
+                    
+                } catch (error) {
+                    console.error('Error fetching Feitomschrijving:', error);
+                    return '';
+                }
+            }
         }
 
         const sharePointService = new SharePointService();
@@ -467,6 +517,9 @@
             // Add debounce timer for duplicate checking
             const [duplicateCheckTimer, setDuplicateCheckTimer] = useState(null);
             
+            // Add state for feitcode lookup status
+            const [feitcodeLookupLoading, setFeitcodeLookupLoading] = useState(false);
+            
             // Cleanup timer on component unmount
             useEffect(() => {
                 return () => {
@@ -492,6 +545,33 @@
                     if (endTime) {
                         updatedData.endTime = endTime;
                     }
+                }
+
+                // Auto-lookup Feitomschrijving when Feitcode changes
+                if (name === 'feitcode' && value && value.trim() !== '') {
+                    // Debounce the lookup to avoid too many API calls
+                    setTimeout(async () => {
+                        setFeitcodeLookupLoading(true);
+                        try {
+                            const feitomschrijving = await sharePointService.getFeitomschrijvingByFeitcode(value.trim());
+                            if (feitomschrijving) {
+                                // Update with the fetched Feitomschrijving
+                                const updatedCaseWithFeitomschrijving = {
+                                    ...updatedData,
+                                    feitomschrijving: feitomschrijving,
+                                    isModified: true
+                                };
+                                onUpdate(index, updatedCaseWithFeitomschrijving);
+                            }
+                        } catch (error) {
+                            console.warn('Failed to lookup Feitomschrijving:', error);
+                        } finally {
+                            setFeitcodeLookupLoading(false);
+                        }
+                    }, 500); // 500ms delay to avoid excessive API calls
+                } else if (name === 'feitcode' && (!value || value.trim() === '')) {
+                    // Clear feitomschrijving when feitcode is cleared
+                    updatedData.feitomschrijving = '';
                 }
                 
                 // Check for duplicates when zaaknummer changes (with debounce)
@@ -783,7 +863,15 @@
                             
                             <!-- Feitomschrijving (full width) -->
                             <div class="mt-4 flex flex-col">
-                                <label for=${`feitomschrijving-${id}`} class="mb-1 font-semibold text-gray-600">Feitomschrijving</label>
+                                <label for=${`feitomschrijving-${id}`} class="mb-1 font-semibold text-gray-600 flex items-center">
+                                    Feitomschrijving
+                                    ${feitcodeLookupLoading && html`
+                                        <div class="ml-2 flex items-center text-sm text-blue-600">
+                                            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-1"></div>
+                                            Bezig met laden...
+                                        </div>
+                                    `}
+                                </label>
                                 <input
                                     type="text"
                                     id=${`feitomschrijving-${id}`}
@@ -791,8 +879,9 @@
                                     value=${feitomschrijving}
                                     onInput=${handleInputChange}
                                     onFocus=${handleFocus}
-                                    class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                                    placeholder="Omschrijving van de overtreding"
+                                    class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition ${feitcodeLookupLoading ? 'bg-blue-50' : ''}"
+                                    placeholder="Omschrijving van de overtreding (wordt automatisch ingevuld bij Feitcode)"
+                                    readonly=${feitcodeLookupLoading}
                                 />
                             </div>
                         </div>
@@ -1105,19 +1194,20 @@
                             const { date, startTime, endTime } = parseDateTimeField(dateTimeField);
                             
                             const zaaknummer = findColumnValue(row, ['Registratienummer', 'zaaknummer', 'Zaaknummer']);
+                            const feitcode = findColumnValue(row, ['Feitcode', 'feitcode']);
                             
                             let caseData = {
                                 id: `case-${index}`,
                                 sharePointId: null,
                                 zaaknummer: zaaknummer,
-                                feitcode: findColumnValue(row, ['Feitcode', 'feitcode']),
+                                feitcode: feitcode,
                                 cjibNummer: cjibNumber,
                                 cjibLast4: cjibNumber ? cjibNumber.toString().slice(-4) : '',
                                 betrokkene: findColumnValue(row, ['Betrokkene', 'betrokkene']),
                                 eigenaar: findColumnValue(row, ['Eigenaar', 'eigenaar']),
                                 soort: findColumnValue(row, ['Soort', 'soort']),
                                 aantekeninghoorverzoek: findColumnValue(row, ['Aantekening hoorverzoek', 'AantekeningHoorverzoek', 'aantekeninghoorverzoek']),
-                                feitomschrijving: '', // Set to blank as requested
+                                feitomschrijving: '', // Will be filled by lookup if feitcode exists
                                 vooronderzoek: findColumnValue(row, ['Vooronderzoek', 'vooronderzoek']),
                                 reactie: '',
                                 hearingDate: date || ensureISODate(new Date()),
@@ -1129,6 +1219,18 @@
                                 status: 'Nieuw',
                                 isModified: true,
                             };
+                            
+                            // Auto-lookup Feitomschrijving for Excel import
+                            if (feitcode && feitcode.trim() !== '') {
+                                try {
+                                    const feitomschrijving = await sharePointService.getFeitomschrijvingByFeitcode(feitcode.trim());
+                                    if (feitomschrijving) {
+                                        caseData.feitomschrijving = feitomschrijving;
+                                    }
+                                } catch (error) {
+                                    console.warn(`Failed to lookup Feitomschrijving for row ${index + 1}:`, error);
+                                }
+                            }
                             
                             // Check for existing case if zaaknummer is provided
                             if (zaaknummer && zaaknummer.trim() !== '') {
