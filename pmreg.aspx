@@ -855,7 +855,7 @@
                                         class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                                     >
                                         ${STATUS_CHOICES.map(choice => html`
-                                            <option value=${choice} selected=${status === choice}>${choice}</option>
+                                            <option value=${choice} ...${ status === choice ? { selected: true } : {} }>${choice}</option>
                                         `)}
                                     </select>
                                 </div>
@@ -881,7 +881,7 @@
                                     onFocus=${handleFocus}
                                     class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition ${feitcodeLookupLoading ? 'bg-blue-50' : ''}"
                                     placeholder="Omschrijving van de overtreding (wordt automatisch ingevuld bij Feitcode)"
-                                    disabled=${feitcodeLookupLoading}
+                                    ...${ feitcodeLookupLoading ? { disabled: true } : {} }
                                 />
                             </div>
                         </div>
@@ -956,7 +956,7 @@
                                 <div class="flex space-x-2">
                                     <button
                                         onClick=${() => handleIndividualTempSave(index)}
-                                        disabled=${connectionStatus !== 'success'}
+                                        ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
                                         class="bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Tijdelijk opslaan - status wordt 'In behandeling'"
                                     >
@@ -964,7 +964,7 @@
                                     </button>
                                     <button
                                         onClick=${() => handleIndividualPrepareForDocGen(index)}
-                                        disabled=${connectionStatus !== 'success'}
+                                        ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
                                         class="bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Klaarzetten voor DocGen"
                                     >
@@ -972,7 +972,7 @@
                                     </button>
                                     <button
                                         onClick=${() => handleIndividualFinalize(index)}
-                                        disabled=${connectionStatus !== 'success'}
+                                        ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
                                         class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Definitief afhandelen - status wordt 'Afgehandeld'"
                                     >
@@ -985,7 +985,7 @@
                                     ${hasSharePointId && html`
                                         <button
                                             onClick=${handleTempSave}
-                                            disabled=${connectionStatus !== 'success'}
+                                            ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
                                             class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Oude tijdelijke opslag (behoudt huidige status)"
                                         >
@@ -994,7 +994,7 @@
                                     `}
                                     <button
                                         onClick=${handleSaveCase}
-                                        disabled=${connectionStatus !== 'success'}
+                                        ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
                                         class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         title=${hasSharePointId ? "Opslaan zonder status wijziging" : "Nieuwe zaak opslaan"}
                                     >
@@ -1822,7 +1822,7 @@
                                     <div class="relative date-menu-container">
                                         <button
                                             onClick=${handleToggleDateMenu}
-                                            disabled=${isLoading || connectionStatus !== 'success'}
+                                            ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
                                             class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                                         >
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1897,14 +1897,14 @@
                                     />
                                     <button
                                         onClick=${() => document.getElementById('excel-import').click()}
-                                        disabled=${isLoading || connectionStatus !== 'success'}
+                                        ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
                                         class="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Excel Import
                                     </button>
                                     <button
                                         onClick=${handleResetAll}
-                                        disabled=${isLoading}
+                                        ...${ isLoading ? { disabled: true } : {} }
                                         class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Resetten
@@ -1915,21 +1915,21 @@
                                 <div class="flex items-center space-x-3">
                                     <button
                                         onClick=${handleTempSaveAll}
-                                        disabled=${isLoading || connectionStatus !== 'success'}
+                                        ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
                                         class="bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-4 focus:ring-orange-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Alles Tijdelijk Opslaan
                                     </button>
                                     <button
                                         onClick=${handlePrepareForDocGen}
-                                        disabled=${isLoading || connectionStatus !== 'success'}
+                                        ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
                                         class="bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-4 focus:ring-yellow-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Alles Klaarzetten DocGen
                                     </button>
                                     <button
                                         onClick=${handleFinalizeAll}
-                                        disabled=${isLoading || connectionStatus !== 'success'}
+                                        ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
                                         class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Alles Definitief
