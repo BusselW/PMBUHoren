@@ -241,6 +241,8 @@ class SharePointService {
         return {
             Title: caseData.zaaknummer || '',
             Feitcode: caseData.feitcode || '',
+            CJIBNummer: caseData.cjibNummer || '', // CJIB Number field - must exist in SharePoint
+            // CJIBLast4: caseData.cjibLast4 || '',   // Excluded: Display-only field (last 4 digits of CJIBNummer)
             Feitomschrijving: caseData.feitomschrijving || '',
             Vooronderzoek: caseData.vooronderzoek || '',
             ReactiePMBU: caseData.reactie || '',
