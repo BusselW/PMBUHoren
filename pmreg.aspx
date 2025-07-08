@@ -399,6 +399,36 @@
             }
         };
 
+        // --- Helper function to calculate end time (start time + 4 minutes) ---
+        const calculateEndTime = (startTime) => {
+            if (!startTime || !startTime.match(/^\d{1,2}:\d{2}$/)) {
+                return '';
+            }
+            
+            try {
+                const [hours, minutes] = startTime.split(':').map(Number);
+                
+                // Validate input time
+                if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+                    return '';
+                }
+                
+                // Calculate end time (+4 minutes)
+                const startMinutes = hours * 60 + minutes;
+                const endMinutes = startMinutes + 4;
+                
+                // Handle day rollover (if time goes past 23:59)
+                const finalMinutes = endMinutes % (24 * 60);
+                const endHours = Math.floor(finalMinutes / 60);
+                const endMins = finalMinutes % 60;
+                
+                return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+            } catch (error) {
+                console.warn('Error calculating end time:', error);
+                return '';
+            }
+        };
+
         // --- Helper function to generate initial empty cases ---
         const createInitialCases = (count) => {
             return Array.from({ length: count }, (_, i) => ({
@@ -451,6 +481,14 @@
                 if (name === 'cjibNummer') {
                     const last4 = value.slice(-4);
                     updatedData.cjibLast4 = last4;
+                }
+                
+                // Auto-calculate end time when start time changes
+                if (name === 'startTime' && value) {
+                    const endTime = calculateEndTime(value);
+                    if (endTime) {
+                        updatedData.endTime = endTime;
+                    }
                 }
                 
                 // Check for duplicates when zaaknummer changes (with debounce)
@@ -949,35 +987,65 @@
                         const parseDateTimeField = (dateTimeStr) => {
                             if (!dateTimeStr) return { date: '', startTime: '', endTime: '' };
                             
+                            console.log('Parsing date/time field:', dateTimeStr);
+                            
                             try {
-                                // Expected format: dd-mm-yyyy hh:mm
-                                const dateTimeRegex = /^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})$/;
-                                const match = dateTimeStr.toString().match(dateTimeRegex);
-                                
-                                if (match) {
-                                    const [, day, month, year, hours, minutes] = match;
-                                    
-                                    // Create proper date object and format to ISO date (YYYY-MM-DD)
-                                    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                                    if (isNaN(dateObj.getTime())) {
-                                        console.warn('Invalid date components:', day, month, year);
-                                        return { date: '', startTime: '', endTime: '' };
+                                // Try multiple formats that might appear in Excel
+                                const formats = [
+                                    // Primary format: dd-mm-yyyy hh:mm
+                                    {
+                                        regex: /^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})$/,
+                                        name: 'dd-mm-yyyy hh:mm'
+                                    },
+                                    // Alternative format: dd/mm/yyyy hh:mm
+                                    {
+                                        regex: /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/,
+                                        name: 'dd/mm/yyyy hh:mm'
+                                    },
+                                    // Alternative format: dd.mm.yyyy hh:mm
+                                    {
+                                        regex: /^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})$/,
+                                        name: 'dd.mm.yyyy hh:mm'
+                                    },
+                                    // Format with more flexible spacing
+                                    {
+                                        regex: /^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})\s*(\d{1,2}):(\d{2})$/,
+                                        name: 'flexible dd-mm-yyyy hh:mm'
                                     }
-                                    
-                                    const formattedDate = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD format
-                                    
-                                    // Format start time as HH:MM
-                                    const startTime = `${hours.padStart(2, '0')}:${minutes}`;
-                                    
-                                    // Calculate end time (+4 minutes)
-                                    const startMinutes = parseInt(hours) * 60 + parseInt(minutes);
-                                    const endMinutes = startMinutes + 4;
-                                    const endHours = Math.floor(endMinutes / 60);
-                                    const endMins = endMinutes % 60;
-                                    const endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
-                                    
-                                    return { date: formattedDate, startTime, endTime };
+                                ];
+                                
+                                for (const format of formats) {
+                                    const match = dateTimeStr.toString().match(format.regex);
+                                    if (match) {
+                                        const [, day, month, year, hours, minutes] = match;
+                                        console.log(`Matched format: ${format.name}`, { day, month, year, hours, minutes });
+                                        
+                                        // Create proper date object and format to ISO date (YYYY-MM-DD)
+                                        const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                        if (isNaN(dateObj.getTime())) {
+                                            console.warn('Invalid date components:', day, month, year);
+                                            continue; // Try next format
+                                        }
+                                        
+                                        const formattedDate = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD format
+                                        
+                                        // Format start time as HH:MM
+                                        const startTime = `${hours.padStart(2, '0')}:${minutes}`;
+                                        
+                                        // Calculate end time using helper function
+                                        const endTime = calculateEndTime(startTime);
+                                        
+                                        console.log('Successfully parsed:', { date: formattedDate, startTime, endTime });
+                                        return { date: formattedDate, startTime, endTime };
+                                    }
                                 }
+                                
+                                console.warn('Date/time format does not match any expected pattern:', dateTimeStr);
+                                console.log('Supported formats:');
+                                console.log('- dd-mm-yyyy hh:mm (e.g., 15-03-2024 14:30)');
+                                console.log('- dd/mm/yyyy hh:mm (e.g., 15/03/2024 14:30)');
+                                console.log('- dd.mm.yyyy hh:mm (e.g., 15.03.2024 14:30)');
+                                
                             } catch (error) {
                                 console.warn('Error parsing date/time:', dateTimeStr, error);
                             }

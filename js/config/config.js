@@ -103,13 +103,13 @@ export const FIELD_CONFIG = [
         displayName: 'Starttijd',
         internalName: 'StartTime',
         fieldType: 'Text',
-        description: 'De starttijd van de specifieke zaakbehandeling (bv. 14:32).'
+        description: 'De starttijd van de specifieke zaakbehandeling (HH:MM formaat, bv. 14:32). Bij Excel import wordt dit automatisch gesplitst uit het "Datum en Tijd hoorzitting" veld. Bij handmatige invoer wordt de eindtijd automatisch berekend.'
     },
     {
         displayName: 'Eindtijd',
         internalName: 'EndTime',
         fieldType: 'Text',
-        description: 'De eindtijd van de specifieke zaakbehandeling (bv. 14:38).'
+        description: 'De eindtijd van de specifieke zaakbehandeling (HH:MM formaat, bv. 14:36). Wordt automatisch berekend als StartTime + 4 minuten bij zowel Excel import als handmatige invoer.'
     },
     {
         displayName: 'Status',
@@ -132,3 +132,38 @@ export const STATUS_CHOICES = [
     'Aangehouden',
     'Afgerond'  // Changed from 'Afgehandeld' to match SharePoint
 ];
+
+// Excel Import Field Mapping
+// This section documents how Excel columns are mapped to SharePoint fields
+export const EXCEL_FIELD_MAPPING = {
+    'Registratienummer': 'Title', // Also accepts: 'zaaknummer', 'Zaaknummer'
+    'Feitcode': 'Feitcode', // Also accepts: 'feitcode'
+    'CJIB-Nummer': 'CJIBNummer', // Also accepts: 'CJIBNummer', 'cjibNummer', 'CJIB Nummer'
+    'Betrokkene': 'Betrokkene', // Also accepts: 'betrokkene'
+    'Eigenaar': 'Eigenaar', // Also accepts: 'eigenaar'
+    'Soort': 'Soort', // Also accepts: 'soort'
+    'Aantekening hoorverzoek': 'AantekeningHoorverzoek', // Also accepts: 'AantekeningHoorverzoek', 'aantekeninghoorverzoek'
+    'Vooronderzoek': 'Vooronderzoek', // Also accepts: 'vooronderzoek'
+    'Verslaglegger': 'Verslaglegger', // Also accepts: 'verslaglegger'
+    'Bedrijfsnaam': 'Bedrijfsnaam', // Also accepts: 'bedrijfsnaam', 'Bedrijf'
+    
+    // Special field: Date and Time splitting
+    'Datum en Tijd hoorzitting': {
+        description: 'Expected format: dd-mm-yyyy hh:mm (e.g., 15-03-2024 14:30)',
+        splits_to: {
+            'HearingDate': 'Date part (converted to YYYY-MM-DD)',
+            'StartTime': 'Time part (HH:MM format)',
+            'EndTime': 'Calculated as StartTime + 4 minutes'
+        },
+        alternatives: ['Datum en tijd hoorzitting', 'Datum_en_Tijd_hoorzitting']
+    },
+    
+    // Fields always set to defaults during import
+    automatic_fields: {
+        'Feitomschrijving': 'Set to blank during import',
+        'ReactiePMBU': 'Set to blank during import (reactie)',
+        'GesprokenMet': 'Set to blank during import',
+        'Status': 'Set to "Bezig met uitwerken"',
+        'CJIBLast4': 'Auto-calculated from CJIBNummer'
+    }
+};
