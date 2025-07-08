@@ -307,6 +307,46 @@
                 }
             }
 
+            async getCaseByZaaknummer(zaaknummer) {
+                try {
+                    if (!zaaknummer || zaaknummer.trim() === '') {
+                        return null;
+                    }
+                    
+                    // Search for existing case by Title (Zaaknummer)
+                    const filter = `Title eq '${zaaknummer.replace(/'/g, "''")}'`; // Escape single quotes
+                    const url = `${this.apiUrl}lists/getbytitle('${this.listName}')/items?$filter=${encodeURIComponent(filter)}&$top=1`;
+                    
+                    console.log('Checking for existing case with Zaaknummer:', zaaknummer);
+                    console.log('Query URL:', url);
+                    
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json;odata=verbose'
+                        },
+                        credentials: 'include'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const results = data.d.results;
+                    
+                    if (results && results.length > 0) {
+                        console.log('Found existing case:', results[0]);
+                        return results[0];
+                    }
+                    
+                    return null;
+                } catch (error) {
+                    console.error('Error checking for existing case:', error);
+                    throw error;
+                }
+            }
+
             transformCaseToSharePoint(caseData) {
                 // Helper function to format date to ISO string for SharePoint
                 const formatDateForSharePoint = (dateStr) => {
@@ -390,6 +430,18 @@
         // Represents a single case with its input fields.
         const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus, useGlobalGesprokenMet }) => {
             const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, betrokkene, eigenaar, soort, aantekeninghoorverzoek, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, verslaglegger, gesprokenMet, status, isModified, sharePointId } = caseData;
+            
+            // Add debounce timer for duplicate checking
+            const [duplicateCheckTimer, setDuplicateCheckTimer] = useState(null);
+            
+            // Cleanup timer on component unmount
+            useEffect(() => {
+                return () => {
+                    if (duplicateCheckTimer) {
+                        clearTimeout(duplicateCheckTimer);
+                    }
+                };
+            }, [duplicateCheckTimer]);
 
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
@@ -401,7 +453,70 @@
                     updatedData.cjibLast4 = last4;
                 }
                 
+                // Check for duplicates when zaaknummer changes (with debounce)
+                if (name === 'zaaknummer' && value.trim() !== '' && !caseData.sharePointId) {
+                    // Clear existing timer
+                    if (duplicateCheckTimer) {
+                        clearTimeout(duplicateCheckTimer);
+                    }
+                    
+                    // Set new timer for duplicate checking (1 second delay)
+                    const newTimer = setTimeout(() => {
+                        checkForDuplicate(value.trim(), index);
+                    }, 1000);
+                    
+                    setDuplicateCheckTimer(newTimer);
+                }
+                
                 onUpdate(index, updatedData);
+            };
+
+            // Function to check for duplicate zaaknummer
+            const checkForDuplicate = async (zaaknummer, caseIndex) => {
+                try {
+                    const existingCase = await sharePointService.getCaseByZaaknummer(zaaknummer);
+                    if (existingCase) {
+                        // Show confirmation dialog to user
+                        const confirmLoad = confirm(
+                            `Zaak "${zaaknummer}" bestaat al in SharePoint.\n\n` +
+                            `Wilt u de bestaande gegevens laden?\n\n` +
+                            `Ja = Bestaande gegevens laden\n` +
+                            `Nee = Doorgaan met nieuwe zaak (kan duplicaat maken)`
+                        );
+                        
+                        if (confirmLoad) {
+                            // Load existing case data
+                            const loadedCaseData = {
+                                id: caseData.id,
+                                sharePointId: existingCase.Id,
+                                zaaknummer: existingCase.Title || '',
+                                feitcode: existingCase.Feitcode || '',
+                                cjibNummer: existingCase.CJIBNummer || '',
+                                cjibLast4: (existingCase.CJIBNummer || '').slice(-4),
+                                betrokkene: existingCase.Betrokkene || '',
+                                eigenaar: existingCase.Eigenaar || '',
+                                soort: existingCase.Soort || '',
+                                aantekeninghoorverzoek: existingCase.AantekeningHoorverzoek || '',
+                                feitomschrijving: existingCase.Feitomschrijving || '',
+                                vooronderzoek: existingCase.Vooronderzoek || '',
+                                reactie: existingCase.ReactiePMBU || '',
+                                hearingDate: existingCase.HearingDate ? new Date(existingCase.HearingDate).toISOString().split('T')[0] : '',
+                                startTime: existingCase.StartTime || '',
+                                endTime: existingCase.EndTime || '',
+                                verslaglegger: existingCase.Verslaglegger || '',
+                                gesprokenMet: existingCase.GesprokenMet || '',
+                                bedrijfsnaam: existingCase.Bedrijfsnaam || '',
+                                status: existingCase.Status || 'Bezig met uitwerken',
+                                isModified: false, // Not modified since we just loaded it
+                            };
+                            
+                            onUpdate(caseIndex, loadedCaseData);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking for duplicate:', error);
+                    // Don't show error to user for duplicate checking
+                }
             };
 
             const handleFocus = () => {
@@ -426,7 +541,17 @@
                     class="bg-white p-6 rounded-lg border-l-4 ${cardBorderColor} ${activeShadow} transition-all duration-300 mb-4"
                 >
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-bold text-gray-700">Zaak #${index + 1}</h3>
+                        <div class="flex items-center space-x-3">
+                            <h3 class="text-xl font-bold text-gray-700">Zaak #${index + 1}</h3>
+                            ${hasSharePointId && html`
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    SharePoint
+                                </span>
+                            `}
+                        </div>
                         <div class="flex space-x-2">
                             ${hasSharePointId && html`
                                 <button
@@ -799,7 +924,9 @@
                 if (!file) return;
 
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = async (e) => {
+                    setIsLoading(true); // Show loading during duplicate checking
+                    
                     try {
                         const data = new Uint8Array(e.target.result);
                         const workbook = XLSX.read(data, { type: 'array' });
@@ -858,19 +985,26 @@
                             return { date: '', startTime: '', endTime: '' };
                         };
 
-                        // Map Excel data to our case format
-                        const importedCases = jsonData.slice(0, 20).map((row, index) => {
+                        // Map Excel data to our case format with duplicate checking
+                        const importedCases = [];
+                        const duplicateInfo = [];
+                        
+                        for (let index = 0; index < Math.min(jsonData.length, 20); index++) {
+                            const row = jsonData[index];
+                            
                             // Find CJIB number (handle both with and without dash)
                             const cjibNumber = findColumnValue(row, ['CJIB-Nummer', 'CJIBNummer', 'cjibNummer', 'CJIB Nummer']);
                             
                             // Parse date and time from combined field
                             const dateTimeField = findColumnValue(row, ['Datum en Tijd hoorzitting', 'Datum en tijd hoorzitting', 'Datum_en_Tijd_hoorzitting']);
                             const { date, startTime, endTime } = parseDateTimeField(dateTimeField);
-
-                            return {
+                            
+                            const zaaknummer = findColumnValue(row, ['Registratienummer', 'zaaknummer', 'Zaaknummer']);
+                            
+                            let caseData = {
                                 id: `case-${index}`,
                                 sharePointId: null,
-                                zaaknummer: findColumnValue(row, ['Registratienummer', 'zaaknummer', 'Zaaknummer']),
+                                zaaknummer: zaaknummer,
                                 feitcode: findColumnValue(row, ['Feitcode', 'feitcode']),
                                 cjibNummer: cjibNumber,
                                 cjibLast4: cjibNumber ? cjibNumber.toString().slice(-4) : '',
@@ -890,7 +1024,35 @@
                                 status: 'Bezig met uitwerken',
                                 isModified: true,
                             };
-                        });
+                            
+                            // Check for existing case if zaaknummer is provided
+                            if (zaaknummer && zaaknummer.trim() !== '') {
+                                try {
+                                    const existingCase = await sharePointService.getCaseByZaaknummer(zaaknummer);
+                                    if (existingCase) {
+                                        // Merge existing data with Excel data, prioritizing Excel data for most fields
+                                        caseData = {
+                                            ...caseData,
+                                            sharePointId: existingCase.Id,
+                                            // Keep existing data for fields that are typically not in Excel
+                                            feitomschrijving: existingCase.Feitomschrijving || '',
+                                            reactie: existingCase.ReactiePMBU || '',
+                                            gesprokenMet: existingCase.GesprokenMet || '',
+                                            status: existingCase.Status || 'Bezig met uitwerken',
+                                            // Excel data takes precedence for most other fields
+                                            isModified: true // Mark as modified so it gets updated
+                                        };
+                                        
+                                        duplicateInfo.push(`Zaak ${zaaknummer} - bestaande data samengevoegd`);
+                                    }
+                                } catch (error) {
+                                    console.warn(`Error checking for existing case ${zaaknummer}:`, error);
+                                    // Continue with import even if duplicate check fails
+                                }
+                            }
+                            
+                            importedCases.push(caseData);
+                        }
 
                         // Fill remaining slots with empty cases
                         while (importedCases.length < 20) {
@@ -921,9 +1083,16 @@
                         }
 
                         setCases(importedCases);
+                        
+                        // Create message with duplicate information
+                        let message = `${Math.min(jsonData.length, 20)} zaken zijn geïmporteerd uit het Excel bestand.`;
+                        if (duplicateInfo.length > 0) {
+                            message += `\n\nDuplicaten gevonden en samengevoegd:\n${duplicateInfo.join('\n')}`;
+                        }
+                        
                         setModalContent({
                             title: 'Excel Import Voltooid',
-                            message: `${Math.min(jsonData.length, 20)} zaken zijn geïmporteerd uit het Excel bestand.`
+                            message: message
                         });
                         setShowInfoModal(true);
 
@@ -934,6 +1103,8 @@
                             message: `Er is een fout opgetreden bij het importeren: ${error.message}`
                         });
                         setShowInfoModal(true);
+                    } finally {
+                        setIsLoading(false); // Hide loading state
                     }
                 };
                 reader.readAsArrayBuffer(file);
