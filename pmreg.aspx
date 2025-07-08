@@ -43,11 +43,21 @@
                 this.apiUrl = SHAREPOINT_CONFIG.apiUrl;
                 this.contextApiUrl = SHAREPOINT_CONFIG.contextApiUrl;
                 this.currentUser = null;
+                
+                // Debug logging
+                console.log('SharePoint Service Configuration:');
+                console.log('- Site URL:', this.siteUrl);
+                console.log('- List Name:', this.listName);
+                console.log('- API URL:', this.apiUrl);
+                console.log('- Context API URL:', this.contextApiUrl);
             }
 
             async getRequestDigest() {
                 try {
-                    const response = await fetch(`${this.contextApiUrl}contextinfo`, {
+                    const contextUrl = `${this.contextApiUrl}contextinfo`;
+                    console.log('Attempting to fetch contextinfo from:', contextUrl);
+                    
+                    const response = await fetch(contextUrl, {
                         method: 'POST',
                         headers: {
                             'Accept': 'application/json;odata=verbose',
@@ -57,6 +67,7 @@
                     });
                     
                     if (!response.ok) {
+                        console.error('Context API response status:', response.status, 'URL:', contextUrl);
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     
