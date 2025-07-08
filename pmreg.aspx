@@ -509,6 +509,35 @@
             }));
         };
 
+        // --- Error Boundary Component ---
+        class ErrorBoundary extends Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+
+            componentDidCatch(error, errorInfo) {
+                console.error('Error Boundary caught an error:', error, errorInfo);
+            }
+
+            render() {
+                if (this.state.hasError) {
+                    return html`
+                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                            <strong>Something went wrong:</strong>
+                            <p>${this.state.error?.message || 'Unknown error'}</p>
+                        </div>
+                    `;
+                }
+
+                return this.props.children;
+            }
+        }
+
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
         const CaseCard = ({ 
@@ -583,26 +612,39 @@
 
                 // Auto-lookup Feitomschrijving when Feitcode changes
                 if (name === 'feitcode' && value && value.trim() !== '') {
-                    // Debounce the lookup to avoid too many API calls
-                    setTimeout(async () => {
-                        setFeitcodeLookupLoading(true);
-                        try {
-                            const feitomschrijving = await sharePointService.getFeitomschrijvingByFeitcode(value.trim());
-                            if (feitomschrijving) {
-                                // Update with the fetched Feitomschrijving
-                                const updatedCaseWithFeitomschrijving = {
-                                    ...updatedData,
-                                    feitomschrijving: feitomschrijving,
-                                    isModified: true
-                                };
-                                onUpdate(index, updatedCaseWithFeitomschrijving);
+                    // Use proper async state management to avoid rendering conflicts
+                    const currentValue = value.trim();
+                    
+                    // Clear any existing timer
+                    if (feitcodeLookupLoading) {
+                        return; // Prevent overlapping requests
+                    }
+                    
+                    // Use requestAnimationFrame to ensure DOM updates are complete
+                    requestAnimationFrame(() => {
+                        setTimeout(async () => {
+                            // Double-check the value hasn't changed
+                            if (caseData.feitcode === currentValue) {
+                                setFeitcodeLookupLoading(true);
+                                try {
+                                    const feitomschrijving = await sharePointService.getFeitomschrijvingByFeitcode(currentValue);
+                                    if (feitomschrijving && caseData.feitcode === currentValue) {
+                                        // Create updated case data
+                                        const updatedCaseWithFeitomschrijving = {
+                                            ...updatedData,
+                                            feitomschrijving: feitomschrijving,
+                                            isModified: true
+                                        };
+                                        onUpdate(index, updatedCaseWithFeitomschrijving);
+                                    }
+                                } catch (error) {
+                                    console.warn('Failed to lookup Feitomschrijving:', error);
+                                } finally {
+                                    setFeitcodeLookupLoading(false);
+                                }
                             }
-                        } catch (error) {
-                            console.warn('Failed to lookup Feitomschrijving:', error);
-                        } finally {
-                            setFeitcodeLookupLoading(false);
-                        }
-                    }, 500); // 500ms delay to avoid excessive API calls
+                        }, 500);
+                    });
                 } else if (name === 'feitcode' && (!value || value.trim() === '')) {
                     // Clear feitomschrijving when feitcode is cleared
                     updatedData.feitomschrijving = '';
@@ -2086,21 +2128,23 @@
                             ${(cases || []).map((caseItem, index) => {
                                 if (!caseItem || typeof index !== 'number') return null;
                                 return html`
-                                    <${CaseCard}
-                                        key=${caseItem.id || `case-${index}`}
-                                        caseData=${caseItem}
-                                        index=${index}
-                                        onUpdate=${handleUpdateCase}
-                                        onFocus=${handleFocusCase}
-                                        onSaveIndividual=${handleSaveIndividual}
-                                        onTempSave=${handleTempSave}
-                                        connectionStatus=${connectionStatus}
-                                        useGlobalGesprokenMet=${useGlobalGesprokenMet}
-                                        isActive=${index === activeCaseIndex}
-                                        handleIndividualTempSave=${handleIndividualTempSave}
-                                        handleIndividualPrepareForDocGen=${handleIndividualPrepareForDocGen}
-                                        handleIndividualFinalize=${handleIndividualFinalize}
-                                    />
+                                    <${ErrorBoundary} key=${`error-boundary-${index}`}>
+                                        <${CaseCard}
+                                            key=${caseItem.id || `case-${index}`}
+                                            caseData=${caseItem}
+                                            index=${index}
+                                            onUpdate=${handleUpdateCase}
+                                            onFocus=${handleFocusCase}
+                                            onSaveIndividual=${handleSaveIndividual}
+                                            onTempSave=${handleTempSave}
+                                            connectionStatus=${connectionStatus}
+                                            useGlobalGesprokenMet=${useGlobalGesprokenMet}
+                                            isActive=${index === activeCaseIndex}
+                                            handleIndividualTempSave=${handleIndividualTempSave}
+                                            handleIndividualPrepareForDocGen=${handleIndividualPrepareForDocGen}
+                                            handleIndividualFinalize=${handleIndividualFinalize}
+                                        />
+                                    </${ErrorBoundary}>
                                 `;
                             }).filter(Boolean)}
                         </div>
@@ -2154,7 +2198,20 @@
         document.addEventListener('DOMContentLoaded', () => {
             const appElement = document.getElementById('app');
             if (appElement) {
-                render(html`<${App} />`, appElement);
+                try {
+                    console.log('Starting app render...');
+                    render(html`<${ErrorBoundary}><${App} /></${ErrorBoundary}>`, appElement);
+                    console.log('App render completed successfully');
+                } catch (error) {
+                    console.error('Error during initial render:', error);
+                    appElement.innerHTML = `
+                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded m-4">
+                            <strong>Application failed to load:</strong>
+                            <p>${error.message}</p>
+                            <p>Please check the console for more details.</p>
+                        </div>
+                    `;
+                }
             } else {
                 console.error('App element not found!');
             }
