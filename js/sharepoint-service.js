@@ -75,11 +75,16 @@ class SharePointService {
             const digest = await this.getRequestDigest();
             const currentUser = await this.getCurrentUser();
             
-            // Add current user to the data
-            const itemWithUser = {
+            // Add required SharePoint metadata type
+            const itemWithMetadata = {
+                __metadata: {
+                    type: `SP.Data.${this.listName}ListItem`
+                },
                 ...itemData,
                 Username: currentUser.Title || currentUser.LoginName
             };
+
+            console.log('Creating item with data:', itemWithMetadata);
 
             const response = await fetch(`${this.apiUrl}lists/getbytitle('${this.listName}')/items`, {
                 method: 'POST',
@@ -89,11 +94,12 @@ class SharePointService {
                     'X-RequestDigest': digest
                 },
                 credentials: 'include',
-                body: JSON.stringify(itemWithUser)
+                body: JSON.stringify(itemWithMetadata)
             });
             
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error('Create item error response:', errorText);
                 throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
             
@@ -110,6 +116,16 @@ class SharePointService {
         try {
             const digest = await this.getRequestDigest();
             
+            // Add required SharePoint metadata type for updates
+            const itemWithMetadata = {
+                __metadata: {
+                    type: `SP.Data.${this.listName}ListItem`
+                },
+                ...itemData
+            };
+
+            console.log('Updating item with data:', itemWithMetadata);
+            
             const response = await fetch(`${this.apiUrl}lists/getbytitle('${this.listName}')/items(${itemId})`, {
                 method: 'POST',
                 headers: {
@@ -120,11 +136,12 @@ class SharePointService {
                     'IF-MATCH': '*'
                 },
                 credentials: 'include',
-                body: JSON.stringify(itemData)
+                body: JSON.stringify(itemWithMetadata)
             });
             
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error('Update item error response:', errorText);
                 throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
             
