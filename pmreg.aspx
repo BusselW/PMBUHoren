@@ -562,7 +562,7 @@
                             cjibNummer: row.CJIBNummer || row.cjibNummer || '',
                             cjibLast4: (row.CJIBNummer || row.cjibNummer || '').slice(-4),
                             feitomschrijving: row.Feitomschrijving || row.feitomschrijving || '',
-                            vooronderzoek: '',
+                            vooronderzoek: row.Vooronderzoek || row.vooronderzoek || '',
                             reactie: '',
                             hearingDate: new Date().toISOString().split('T')[0],
                             startTime: '',
