@@ -115,8 +115,8 @@ export const FIELD_CONFIG = [
         displayName: 'Status',
         internalName: 'Status',
         fieldType: 'Choice',
-        description: 'Status van de zaak (bijv. \'Nieuw\', \'In behandeling\', \'Afgerond\').',
-        choices: ['Bezig met uitwerken', 'Aangehouden', 'Afgerond']  // Updated to match SharePoint
+        description: 'Status van de zaak doorheen de workflow.',
+        choices: ['Nieuw', 'Voorbereiding', 'In behandeling', 'Aangehouden', 'Klaarzetten voor DocGen', 'Afgehandeld']
     },
     {
         displayName: 'Gebruiker',
@@ -126,11 +126,14 @@ export const FIELD_CONFIG = [
     }
 ];
 
-// Status choices (matching SharePoint exactly)
+// Status choices (updated workflow)
 export const STATUS_CHOICES = [
-    'Bezig met uitwerken',
+    'Nieuw',
+    'Voorbereiding',
+    'In behandeling',
     'Aangehouden',
-    'Afgerond'  // Changed from 'Afgehandeld' to match SharePoint
+    'Klaarzetten voor DocGen',
+    'Afgehandeld'
 ];
 
 // Excel Import Field Mapping
@@ -163,7 +166,7 @@ export const EXCEL_FIELD_MAPPING = {
         'Feitomschrijving': 'Set to blank during import',
         'ReactiePMBU': 'Set to blank during import (reactie)',
         'GesprokenMet': 'Set to blank during import',
-        'Status': 'Set to "Bezig met uitwerken"',
+        'Status': 'Set to "Nieuw"',
         'CJIBLast4': 'Auto-calculated from CJIBNummer'
     }
 };

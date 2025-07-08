@@ -29,11 +29,14 @@
             listUrl: 'https://som.org.om.local/sites/MulderT/T/PMREG/',
         };
 
-        // Status choices (matching SharePoint exactly)
+        // Status choices (updated workflow)
         const STATUS_CHOICES = [
-            'Bezig met uitwerken',
+            'Nieuw',
+            'Voorbereiding',
+            'In behandeling',
             'Aangehouden',
-            'Afgerond'  // Changed from 'Afgehandeld' to match SharePoint
+            'Klaarzetten voor DocGen',
+            'Afgehandeld'
         ];
 
         // SharePoint Service Class
@@ -222,8 +225,8 @@
 
             async getAvailableDatesWithIncompleteCases() {
                 try {
-                    // Query SharePoint for items where Status is not 'Afgerond'
-                    const filter = "Status ne 'Afgerond'";
+                    // Query SharePoint for items where Status is not 'Afgehandeld'
+                    const filter = "Status ne 'Afgehandeld'";
                     const select = "HearingDate,Status,Id";
                     const url = `${this.apiUrl}lists/getbytitle('${this.listName}')/items?$filter=${encodeURIComponent(filter)}&$select=${select}&$orderby=HearingDate desc`;
                     
@@ -281,7 +284,7 @@
                     const endDate = new Date(targetDate + 'T23:59:59.999Z');
                     
                     // Use ISO string format for SharePoint datetime filtering
-                    const filter = `HearingDate ge datetime'${startDate.toISOString()}' and HearingDate le datetime'${endDate.toISOString()}' and Status ne 'Afgerond'`;
+                    const filter = `HearingDate ge datetime'${startDate.toISOString()}' and HearingDate le datetime'${endDate.toISOString()}' and Status ne 'Afgehandeld'`;
                     const url = `${this.apiUrl}lists/getbytitle('${this.listName}')/items?$filter=${encodeURIComponent(filter)}&$orderby=StartTime asc`;
                     
                     console.log('Fetching cases for date:', targetDate, 'ISO range:', startDate.toISOString(), 'to', endDate.toISOString());
@@ -451,14 +454,14 @@
                 verslaglegger: '',
                 gesprokenMet: '',
                 bedrijfsnaam: '',
-                status: 'Bezig met uitwerken', // Matches SharePoint exactly
+                status: 'Nieuw', // Default status for new cases
                 isModified: false,
             }));
         };
 
         // --- CaseCard Component ---
         // Represents a single case with its input fields.
-        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus, useGlobalGesprokenMet }) => {
+        const CaseCard = ({ caseData, index, onUpdate, onFocus, isActive, onSaveIndividual, onTempSave, connectionStatus, useGlobalGesprokenMet, handleIndividualTempSave, handleIndividualPrepareForDocGen, handleIndividualFinalize }) => {
             const { id, zaaknummer, feitcode, cjibNummer, cjibLast4, betrokkene, eigenaar, soort, aantekeninghoorverzoek, feitomschrijving, vooronderzoek, reactie, hearingDate, startTime, endTime, verslaglegger, gesprokenMet, status, isModified, sharePointId } = caseData;
             
             // Add debounce timer for duplicate checking
@@ -589,26 +592,6 @@
                                     SharePoint
                                 </span>
                             `}
-                        </div>
-                        <div class="flex space-x-2">
-                            ${hasSharePointId && html`
-                                <button
-                                    onClick=${handleTempSave}
-                                    disabled=${connectionStatus !== 'success'}
-                                    class="bg-orange-500 text-white font-bold py-1 px-4 rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Tijdelijk opslaan voor aanpassingen"
-                                >
-                                    Temp. Opslaan
-                                </button>
-                            `}
-                            <button
-                                onClick=${handleSaveCase}
-                                disabled=${connectionStatus !== 'success'}
-                                class="bg-green-600 text-white font-bold py-1 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                title=${hasSharePointId ? "Definitief opslaan" : "Nieuwe zaak opslaan"}
-                            >
-                                ${hasSharePointId ? "Definitief" : "Opslaan"}
-                            </button>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 gap-6">
@@ -877,6 +860,60 @@
                                 ></textarea>
                             </div>
                         </div>
+                        
+                        <!-- Individual Action Buttons -->
+                        <div class="bg-gray-100 p-4 rounded-lg border-t border-gray-200">
+                            <div class="flex justify-between items-center flex-wrap gap-2">
+                                <div class="flex space-x-2">
+                                    <button
+                                        onClick=${() => handleIndividualTempSave(index)}
+                                        disabled=${connectionStatus !== 'success'}
+                                        class="bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Tijdelijk opslaan - status wordt 'In behandeling'"
+                                    >
+                                        Tijdelijk Opslaan
+                                    </button>
+                                    <button
+                                        onClick=${() => handleIndividualPrepareForDocGen(index)}
+                                        disabled=${connectionStatus !== 'success'}
+                                        class="bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Klaarzetten voor DocGen"
+                                    >
+                                        Klaarzetten DocGen
+                                    </button>
+                                    <button
+                                        onClick=${() => handleIndividualFinalize(index)}
+                                        disabled=${connectionStatus !== 'success'}
+                                        class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Definitief afhandelen - status wordt 'Afgehandeld'"
+                                    >
+                                        Definitief
+                                    </button>
+                                </div>
+                                
+                                <!-- Legacy Individual Save Button -->
+                                <div class="flex space-x-2">
+                                    ${hasSharePointId && html`
+                                        <button
+                                            onClick=${handleTempSave}
+                                            disabled=${connectionStatus !== 'success'}
+                                            class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Oude tijdelijke opslag (behoudt huidige status)"
+                                        >
+                                            Temp. Opslaan (Legacy)
+                                        </button>
+                                    `}
+                                    <button
+                                        onClick=${handleSaveCase}
+                                        disabled=${connectionStatus !== 'success'}
+                                        class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title=${hasSharePointId ? "Opslaan zonder status wijziging" : "Nieuwe zaak opslaan"}
+                                    >
+                                        ${hasSharePointId ? "Opslaan" : "Nieuwe Zaak"}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1089,7 +1126,7 @@
                                 verslaglegger: findColumnValue(row, ['Verslaglegger', 'verslaglegger']),
                                 gesprokenMet: '',
                                 bedrijfsnaam: findColumnValue(row, ['Bedrijfsnaam', 'bedrijfsnaam', 'Bedrijf']),
-                                status: 'Bezig met uitwerken',
+                                status: 'Nieuw',
                                 isModified: true,
                             };
                             
@@ -1145,7 +1182,7 @@
                                 verslaglegger: '',
                                 gesprokenMet: '',
                                 bedrijfsnaam: '',
-                                status: 'Bezig met uitwerken',
+                                status: 'Nieuw',
                                 isModified: false,
                             });
                         }
@@ -1258,18 +1295,18 @@
                     // Add temporary status flag to indicate this is a work-in-progress update
                     const tempData = {
                         ...sharePointData,
-                        Status: 'Bezig met uitwerken' // Force status to indicate work in progress
+                        Status: 'In behandeling' // Force status to indicate work in progress
                     };
                     
                     await sharePointService.updateItem(caseData.sharePointId, tempData);
                     
                     // Update local state to reflect saved changes
-                    const updatedCase = { ...finalCaseData, isModified: false, status: 'Bezig met uitwerken' };
+                    const updatedCase = { ...finalCaseData, isModified: false, status: 'In behandeling' };
                     handleUpdateCase(index, updatedCase);
                     
                     setModalContent({
                         title: 'Tijdelijk Opgeslagen',
-                        message: `Zaak #${index + 1} is tijdelijk opgeslagen. Status is ingesteld op 'Bezig met uitwerken' voor verdere bewerking.`
+                        message: `Zaak #${index + 1} is tijdelijk opgeslagen. Status is ingesteld op 'In behandeling' voor verdere bewerking.`
                     });
                     setShowInfoModal(true);
                     
@@ -1348,6 +1385,170 @@
                     setIsLoading(false);
                     setShowInfoModal(true);
                 }
+            };
+
+            // Bulk status update function
+            const updateAllCasesStatus = async (newStatus, actionName) => {
+                setIsLoading(true);
+                const errors = [];
+                const successes = [];
+                
+                try {
+                    for (let i = 0; i < cases.length; i++) {
+                        const caseData = cases[i];
+                        
+                        // Only update cases that have data (not empty cases)
+                        if (caseData.zaaknummer || caseData.feitcode || caseData.sharePointId) {
+                            try {
+                                // Apply global fields based on settings
+                                const finalCaseData = {
+                                    ...caseData,
+                                    status: newStatus,
+                                    verslaglegger: globalVerslaglegger, // Always global
+                                    gesprokenMet: useGlobalGesprokenMet ? globalGesprokenMet : caseData.gesprokenMet,
+                                    bedrijfsnaam: isGemachtigde ? globalBedrijfsnaam : ''
+                                };
+                                
+                                const sharePointData = sharePointService.transformCaseToSharePoint(finalCaseData);
+                                
+                                let result;
+                                if (caseData.sharePointId) {
+                                    // Update existing item
+                                    result = await sharePointService.updateItem(caseData.sharePointId, sharePointData);
+                                } else {
+                                    // Create new item
+                                    result = await sharePointService.createItem(sharePointData);
+                                    
+                                    // Update the case with the SharePoint ID
+                                    const updatedCase = { ...finalCaseData, sharePointId: result.Id, isModified: false };
+                                    handleUpdateCase(i, updatedCase);
+                                }
+                                
+                                // Update local state
+                                const updatedCase = { ...finalCaseData, isModified: false };
+                                handleUpdateCase(i, updatedCase);
+                                successes.push(`Zaak #${i + 1}`);
+                                
+                            } catch (error) {
+                                console.error(`Error updating case ${i + 1}:`, error);
+                                errors.push(`Zaak #${i + 1}: ${error.message}`);
+                            }
+                        }
+                    }
+                    
+                    if (errors.length === 0) {
+                        setModalContent({
+                            title: `${actionName} Voltooid`,
+                            message: `${successes.length} zaken zijn bijgewerkt naar status "${newStatus}".`
+                        });
+                    } else {
+                        setModalContent({
+                            title: `${actionName} Gedeeltelijk Voltooid`,
+                            message: `${successes.length} zaken bijgewerkt. ${errors.length} fouten:\n${errors.join('\n')}`
+                        });
+                    }
+                    
+                } catch (error) {
+                    console.error(`Error in ${actionName}:`, error);
+                    setModalContent({
+                        title: 'Fout',
+                        message: `Er is een algemene fout opgetreden: ${error.message}`
+                    });
+                } finally {
+                    setIsLoading(false);
+                    setShowInfoModal(true);
+                }
+            };
+
+            // Handle tijdelijk opslaan all (set all to "In behandeling")
+            const handleTempSaveAll = async () => {
+                await updateAllCasesStatus('In behandeling', 'Tijdelijk Opslaan');
+            };
+
+            // Handle klaarzetten voor DocGen all
+            const handlePrepareForDocGen = async () => {
+                await updateAllCasesStatus('Klaarzetten voor DocGen', 'Klaarzetten voor DocGen');
+            };
+
+            // Handle definitief all (set all to "Afgehandeld")
+            const handleFinalizeAll = async () => {
+                await updateAllCasesStatus('Afgehandeld', 'Definitief Afhandelen');
+            };
+
+            // Individual status update function
+            const updateIndividualCaseStatus = async (index, newStatus, actionName) => {
+                const caseData = cases[index];
+                
+                // Check if case has SharePoint ID for updates
+                if (!caseData.sharePointId && !caseData.zaaknummer && !caseData.feitcode) {
+                    setModalContent({
+                        title: 'Geen data',
+                        message: `Zaak #${index + 1} heeft geen data om bij te werken.`
+                    });
+                    setShowInfoModal(true);
+                    return;
+                }
+                
+                setIsLoading(true);
+                
+                try {
+                    // Apply global fields based on settings
+                    const finalCaseData = {
+                        ...caseData,
+                        status: newStatus,
+                        verslaglegger: globalVerslaglegger, // Always global
+                        gesprokenMet: useGlobalGesprokenMet ? globalGesprokenMet : caseData.gesprokenMet,
+                        bedrijfsnaam: isGemachtigde ? globalBedrijfsnaam : ''
+                    };
+                    
+                    const sharePointData = sharePointService.transformCaseToSharePoint(finalCaseData);
+                    
+                    let result;
+                    if (caseData.sharePointId) {
+                        // Update existing item
+                        result = await sharePointService.updateItem(caseData.sharePointId, sharePointData);
+                    } else {
+                        // Create new item
+                        result = await sharePointService.createItem(sharePointData);
+                        
+                        // Update the case with the SharePoint ID
+                        const updatedCase = { ...finalCaseData, sharePointId: result.Id, isModified: false };
+                        handleUpdateCase(index, updatedCase);
+                    }
+                    
+                    // Update local state
+                    const updatedCase = { ...finalCaseData, isModified: false };
+                    handleUpdateCase(index, updatedCase);
+                    
+                    setModalContent({
+                        title: `${actionName} Voltooid`,
+                        message: `Zaak #${index + 1} is bijgewerkt naar status "${newStatus}".`
+                    });
+                    setShowInfoModal(true);
+                    
+                } catch (error) {
+                    console.error(`Error in ${actionName} for case ${index + 1}:`, error);
+                    setModalContent({
+                        title: 'Fout',
+                        message: `Er is een fout opgetreden bij ${actionName} van zaak #${index + 1}: ${error.message}`
+                    });
+                    setShowInfoModal(true);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Individual status update handlers
+            const handleIndividualTempSave = async (index) => {
+                await updateIndividualCaseStatus(index, 'In behandeling', 'Tijdelijk Opslaan');
+            };
+
+            const handleIndividualPrepareForDocGen = async (index) => {
+                await updateIndividualCaseStatus(index, 'Klaarzetten voor DocGen', 'Klaarzetten voor DocGen');
+            };
+
+            const handleIndividualFinalize = async (index) => {
+                await updateIndividualCaseStatus(index, 'Afgehandeld', 'Definitief Afhandelen');
             };
             
             // --- Reset Logic ---
@@ -1451,7 +1652,7 @@
                             verslaglegger: '',
                             gesprokenMet: '',
                             bedrijfsnaam: '',
-                            status: 'Bezig met uitwerken',
+                            status: 'Nieuw',
                             isModified: false,
                         });
                     }
@@ -1512,7 +1713,9 @@
                                         `}
                                     </div>
                                 </div>
-                                <div class="flex items-center space-x-3">
+                                <div class="flex items-center justify-between">
+                                    <!-- Left side buttons -->
+                                    <div class="flex items-center space-x-3">
                                     <!-- Date Menu Button -->
                                     <div class="relative date-menu-container">
                                         <button
@@ -1598,18 +1801,36 @@
                                         Excel Import
                                     </button>
                                     <button
-                                        onClick=${handleSaveAll}
-                                        disabled=${isLoading || connectionStatus !== 'success'}
-                                        class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Alles Opslaan
-                                    </button>
-                                    <button
                                         onClick=${handleResetAll}
                                         disabled=${isLoading}
                                         class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Resetten
+                                    </button>
+                                    </div>
+                                
+                                <!-- Right side buttons -->
+                                <div class="flex items-center space-x-3">
+                                    <button
+                                        onClick=${handleTempSaveAll}
+                                        disabled=${isLoading || connectionStatus !== 'success'}
+                                        class="bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-4 focus:ring-orange-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Alles Tijdelijk Opslaan
+                                    </button>
+                                    <button
+                                        onClick=${handlePrepareForDocGen}
+                                        disabled=${isLoading || connectionStatus !== 'success'}
+                                        class="bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-4 focus:ring-yellow-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Alles Klaarzetten DocGen
+                                    </button>
+                                    <button
+                                        onClick=${handleFinalizeAll}
+                                        disabled=${isLoading || connectionStatus !== 'success'}
+                                        class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Alles Definitief
                                     </button>
                                 </div>
                             </div>
@@ -1737,6 +1958,9 @@
                                     connectionStatus=${connectionStatus}
                                     useGlobalGesprokenMet=${useGlobalGesprokenMet}
                                     isActive=${index === activeCaseIndex}
+                                    handleIndividualTempSave=${handleIndividualTempSave}
+                                    handleIndividualPrepareForDocGen=${handleIndividualPrepareForDocGen}
+                                    handleIndividualFinalize=${handleIndividualFinalize}
                                 />
                             `)}
                         </div>
