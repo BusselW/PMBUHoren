@@ -881,7 +881,7 @@
                                     onFocus=${handleFocus}
                                     class="p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition ${feitcodeLookupLoading ? 'bg-blue-50' : ''}"
                                     placeholder="Omschrijving van de overtreding (wordt automatisch ingevuld bij Feitcode)"
-                                    readonly=${feitcodeLookupLoading}
+                                    disabled=${feitcodeLookupLoading}
                                 />
                             </div>
                         </div>
@@ -2112,7 +2112,15 @@
         };
 
         // --- Render the App ---
-        render(html`<${App} />`, document.getElementById('app'));
+        // Wait for DOM to be ready before rendering
+        document.addEventListener('DOMContentLoaded', () => {
+            const appElement = document.getElementById('app');
+            if (appElement) {
+                render(html`<${App} />`, appElement);
+            } else {
+                console.error('App element not found!');
+            }
+        });
     </script>
 </head>
 <body class="bg-gray-50">
