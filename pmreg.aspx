@@ -220,6 +220,91 @@
                 }
             }
 
+            async getAvailableDatesWithIncompleteCases() {
+                try {
+                    // Query SharePoint for items where Status is not 'Afgerond'
+                    const filter = "Status ne 'Afgerond'";
+                    const select = "HearingDate,Status,Id";
+                    const url = `${this.apiUrl}lists/getbytitle('${this.listName}')/items?$filter=${encodeURIComponent(filter)}&$select=${select}&$orderby=HearingDate desc`;
+                    
+                    console.log('Fetching available dates from:', url);
+                    
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json;odata=verbose'
+                        },
+                        credentials: 'include'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const items = data.d.results;
+                    
+                    // Group by hearing date and count items
+                    const dateGroups = {};
+                    items.forEach(item => {
+                        if (item.HearingDate) {
+                            const date = new Date(item.HearingDate).toISOString().split('T')[0];
+                            if (!dateGroups[date]) {
+                                dateGroups[date] = [];
+                            }
+                            dateGroups[date].push(item);
+                        }
+                    });
+                    
+                    // Convert to array with date info
+                    const availableDates = Object.keys(dateGroups)
+                        .map(date => ({
+                            date: date,
+                            displayDate: new Date(date).toLocaleDateString('nl-NL'),
+                            count: dateGroups[date].length,
+                            items: dateGroups[date]
+                        }))
+                        .sort((a, b) => new Date(b.date) - new Date(a.date)); // Most recent first
+                    
+                    return availableDates;
+                } catch (error) {
+                    console.error('Error fetching available dates:', error);
+                    throw error;
+                }
+            }
+
+            async getCasesByDate(targetDate) {
+                try {
+                    // Convert date to SharePoint datetime format for filtering
+                    const startDate = new Date(targetDate);
+                    const endDate = new Date(targetDate);
+                    endDate.setDate(endDate.getDate() + 1);
+                    
+                    const filter = `HearingDate ge datetime'${startDate.toISOString()}' and HearingDate lt datetime'${endDate.toISOString()}' and Status ne 'Afgerond'`;
+                    const url = `${this.apiUrl}lists/getbytitle('${this.listName}')/items?$filter=${encodeURIComponent(filter)}&$orderby=StartTime asc`;
+                    
+                    console.log('Fetching cases for date:', targetDate, 'from:', url);
+                    
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json;odata=verbose'
+                        },
+                        credentials: 'include'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    return data.d.results;
+                } catch (error) {
+                    console.error('Error fetching cases by date:', error);
+                    throw error;
+                }
+            }
+
             transformCaseToSharePoint(caseData) {
                 return {
                     Title: caseData.zaaknummer || '',
@@ -564,6 +649,9 @@
             const [modalContent, setModalContent] = useState({ title: '', message: '' });
             const [isLoading, setIsLoading] = useState(false);
             const [connectionStatus, setConnectionStatus] = useState('checking'); // checking, success, failed
+            const [showDateMenu, setShowDateMenu] = useState(false);
+            const [availableDates, setAvailableDates] = useState([]);
+            const [loadingDates, setLoadingDates] = useState(false);
 
             // Test SharePoint connection on load
             useEffect(() => {
@@ -585,6 +673,20 @@
                 
                 testConnection();
             }, []);
+
+            // Close date menu when clicking outside
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (showDateMenu && !event.target.closest('.date-menu-container')) {
+                        setShowDateMenu(false);
+                    }
+                };
+
+                if (showDateMenu) {
+                    document.addEventListener('mousedown', handleClickOutside);
+                    return () => document.removeEventListener('mousedown', handleClickOutside);
+                }
+            }, [showDateMenu]);
 
             // Effect to scroll to the active card
             useEffect(() => {
@@ -912,6 +1014,104 @@
                 setShowInfoModal(false);
             };
 
+            // Date menu functions
+            const handleToggleDateMenu = async () => {
+                if (!showDateMenu && availableDates.length === 0) {
+                    // Load available dates when opening menu for the first time
+                    setLoadingDates(true);
+                    try {
+                        const dates = await sharePointService.getAvailableDatesWithIncompleteCases();
+                        setAvailableDates(dates);
+                    } catch (error) {
+                        console.error('Error loading available dates:', error);
+                        setModalContent({
+                            title: 'Fout bij Laden Datums',
+                            message: `Kan beschikbare datums niet laden: ${error.message}`
+                        });
+                        setShowInfoModal(true);
+                    } finally {
+                        setLoadingDates(false);
+                    }
+                }
+                setShowDateMenu(!showDateMenu);
+            };
+
+            const handleLoadCasesForDate = async (selectedDate) => {
+                setIsLoading(true);
+                setShowDateMenu(false);
+                
+                try {
+                    const sharePointCases = await sharePointService.getCasesByDate(selectedDate);
+                    
+                    // Transform SharePoint data to our case format
+                    const transformedCases = sharePointCases.map((spCase, index) => ({
+                        id: `case-${index}`,
+                        sharePointId: spCase.Id,
+                        zaaknummer: spCase.Title || '',
+                        feitcode: spCase.Feitcode || '',
+                        cjibNummer: spCase.CJIBNummer || '',
+                        cjibLast4: (spCase.CJIBNummer || '').slice(-4),
+                        betrokkene: spCase.Betrokkene || '',
+                        eigenaar: spCase.Eigenaar || '',
+                        soort: spCase.Soort || '',
+                        aantekeninghoorverzoek: spCase.AantekeningHoorverzoek || '',
+                        feitomschrijving: spCase.Feitomschrijving || '',
+                        vooronderzoek: spCase.Vooronderzoek || '',
+                        reactie: spCase.ReactiePMBU || '',
+                        hearingDate: spCase.HearingDate ? new Date(spCase.HearingDate).toISOString().split('T')[0] : '',
+                        startTime: spCase.StartTime || '',
+                        endTime: spCase.EndTime || '',
+                        status: spCase.Status || 'Bezig met uitwerken',
+                        isModified: false,
+                    }));
+
+                    // Fill remaining slots with empty cases
+                    while (transformedCases.length < 20) {
+                        const index = transformedCases.length;
+                        transformedCases.push({
+                            id: `case-${index}`,
+                            sharePointId: null,
+                            zaaknummer: '',
+                            feitcode: '',
+                            cjibNummer: '',
+                            cjibLast4: '',
+                            betrokkene: '',
+                            eigenaar: '',
+                            soort: '',
+                            aantekeninghoorverzoek: '',
+                            feitomschrijving: '',
+                            vooronderzoek: '',
+                            reactie: '',
+                            hearingDate: selectedDate,
+                            startTime: '',
+                            endTime: '',
+                            status: 'Bezig met uitwerken',
+                            isModified: false,
+                        });
+                    }
+
+                    setCases(transformedCases);
+                    setActiveCaseIndex(0);
+                    
+                    const displayDate = new Date(selectedDate).toLocaleDateString('nl-NL');
+                    setModalContent({
+                        title: 'Zaken Geladen',
+                        message: `${sharePointCases.length} onafgeronde zaken voor ${displayDate} zijn geladen.`
+                    });
+                    setShowInfoModal(true);
+                    
+                } catch (error) {
+                    console.error('Error loading cases for date:', error);
+                    setModalContent({
+                        title: 'Fout bij Laden Zaken',
+                        message: `Kan zaken voor de geselecteerde datum niet laden: ${error.message}`
+                    });
+                    setShowInfoModal(true);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
             return html`
                 <div class="bg-gray-50 min-h-screen font-sans">
                     <!-- Loading Overlay -->
@@ -946,6 +1146,76 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-3">
+                                    <!-- Date Menu Button -->
+                                    <div class="relative date-menu-container">
+                                        <button
+                                            onClick=${handleToggleDateMenu}
+                                            disabled=${isLoading || connectionStatus !== 'success'}
+                                            class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                                        >
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            </svg>
+                                            <span>Laden per Datum</span>
+                                        </button>
+                                        
+                                        <!-- Floating Date Menu -->
+                                        ${showDateMenu && html`
+                                            <div class="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-30 max-h-96 overflow-y-auto">
+                                                <div class="p-4 border-b border-gray-200">
+                                                    <h3 class="text-lg font-semibold text-gray-800">Beschikbare Datums</h3>
+                                                    <p class="text-sm text-gray-600">Selecteer een datum om onafgeronde zaken te laden</p>
+                                                </div>
+                                                
+                                                ${loadingDates && html`
+                                                    <div class="p-6 text-center">
+                                                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+                                                        <p class="text-gray-600">Datums laden...</p>
+                                                    </div>
+                                                `}
+                                                
+                                                ${!loadingDates && availableDates.length === 0 && html`
+                                                    <div class="p-6 text-center">
+                                                        <p class="text-gray-600">Geen onafgeronde zaken gevonden</p>
+                                                    </div>
+                                                `}
+                                                
+                                                ${!loadingDates && availableDates.length > 0 && html`
+                                                    <div class="max-h-72 overflow-y-auto">
+                                                        ${availableDates.map(dateInfo => html`
+                                                            <button
+                                                                key=${dateInfo.date}
+                                                                onClick=${() => handleLoadCasesForDate(dateInfo.date)}
+                                                                class="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 transition-colors duration-200 flex justify-between items-center group"
+                                                            >
+                                                                <div>
+                                                                    <div class="font-medium text-gray-800 group-hover:text-indigo-600">
+                                                                        ${dateInfo.displayDate}
+                                                                    </div>
+                                                                    <div class="text-sm text-gray-500">
+                                                                        ${dateInfo.count} ${dateInfo.count === 1 ? 'zaak' : 'zaken'} te voltooien
+                                                                    </div>
+                                                                </div>
+                                                                <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                                                </svg>
+                                                            </button>
+                                                        `)}
+                                                    </div>
+                                                `}
+                                                
+                                                <div class="p-3 border-t border-gray-200">
+                                                    <button
+                                                        onClick=${() => setShowDateMenu(false)}
+                                                        class="w-full px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded transition-colors duration-200"
+                                                    >
+                                                        Sluiten
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        `}
+                                    </div>
+                                    
                                     <input
                                         type="file"
                                         accept=".xlsx,.xls"
