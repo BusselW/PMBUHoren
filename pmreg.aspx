@@ -248,6 +248,7 @@
                     const dateGroups = {};
                     items.forEach(item => {
                         if (item.HearingDate) {
+                            // Parse SharePoint date and convert to ISO date string (YYYY-MM-DD)
                             const date = new Date(item.HearingDate).toISOString().split('T')[0];
                             if (!dateGroups[date]) {
                                 dateGroups[date] = [];
@@ -259,12 +260,12 @@
                     // Convert to array with date info
                     const availableDates = Object.keys(dateGroups)
                         .map(date => ({
-                            date: date,
-                            displayDate: new Date(date).toLocaleDateString('nl-NL'),
+                            date: date, // ISO format YYYY-MM-DD
+                            displayDate: new Date(date + 'T12:00:00.000Z').toLocaleDateString('nl-NL'), // Add time to avoid timezone issues
                             count: dateGroups[date].length,
                             items: dateGroups[date]
                         }))
-                        .sort((a, b) => new Date(b.date) - new Date(a.date)); // Most recent first
+                        .sort((a, b) => new Date(b.date + 'T12:00:00.000Z') - new Date(a.date + 'T12:00:00.000Z')); // Most recent first
                     
                     return availableDates;
                 } catch (error) {
@@ -275,15 +276,16 @@
 
             async getCasesByDate(targetDate) {
                 try {
-                    // Convert date to SharePoint datetime format for filtering
-                    const startDate = new Date(targetDate);
-                    const endDate = new Date(targetDate);
-                    endDate.setDate(endDate.getDate() + 1);
+                    // Ensure targetDate is in ISO format and create proper date range
+                    const startDate = new Date(targetDate + 'T00:00:00.000Z');
+                    const endDate = new Date(targetDate + 'T23:59:59.999Z');
                     
-                    const filter = `HearingDate ge datetime'${startDate.toISOString()}' and HearingDate lt datetime'${endDate.toISOString()}' and Status ne 'Afgerond'`;
+                    // Use ISO string format for SharePoint datetime filtering
+                    const filter = `HearingDate ge datetime'${startDate.toISOString()}' and HearingDate le datetime'${endDate.toISOString()}' and Status ne 'Afgerond'`;
                     const url = `${this.apiUrl}lists/getbytitle('${this.listName}')/items?$filter=${encodeURIComponent(filter)}&$orderby=StartTime asc`;
                     
-                    console.log('Fetching cases for date:', targetDate, 'from:', url);
+                    console.log('Fetching cases for date:', targetDate, 'ISO range:', startDate.toISOString(), 'to', endDate.toISOString());
+                    console.log('Query URL:', url);
                     
                     const response = await fetch(url, {
                         method: 'GET',
@@ -306,6 +308,19 @@
             }
 
             transformCaseToSharePoint(caseData) {
+                // Helper function to format date to ISO string for SharePoint
+                const formatDateForSharePoint = (dateStr) => {
+                    if (!dateStr) return null;
+                    try {
+                        const date = new Date(dateStr);
+                        if (isNaN(date.getTime())) return null;
+                        return date.toISOString();
+                    } catch (error) {
+                        console.warn('Invalid date format:', dateStr);
+                        return null;
+                    }
+                };
+
                 return {
                     Title: caseData.zaaknummer || '',
                     Feitcode: caseData.feitcode || '',
@@ -318,7 +333,7 @@
                     Feitomschrijving: caseData.feitomschrijving || '',
                     Vooronderzoek: caseData.vooronderzoek || '',
                     ReactiePMBU: caseData.reactie || '',
-                    HearingDate: caseData.hearingDate || null,
+                    HearingDate: formatDateForSharePoint(caseData.hearingDate),
                     StartTime: caseData.startTime || '',
                     EndTime: caseData.endTime || '',
                     Verslaglegger: caseData.verslaglegger || '',
@@ -330,6 +345,19 @@
         }
 
         const sharePointService = new SharePointService();
+
+        // --- Helper function for consistent ISO date handling ---
+        const ensureISODate = (dateInput) => {
+            if (!dateInput) return '';
+            try {
+                const date = new Date(dateInput);
+                if (isNaN(date.getTime())) return '';
+                return date.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+            } catch (error) {
+                console.warn('Invalid date input:', dateInput);
+                return '';
+            }
+        };
 
         // --- Helper function to generate initial empty cases ---
         const createInitialCases = (count) => {
@@ -347,7 +375,7 @@
                 feitomschrijving: '',
                 vooronderzoek: '',
                 reactie: '',
-                hearingDate: new Date().toISOString().split('T')[0], // Today's date
+                hearingDate: ensureISODate(new Date()), // Today's date in ISO format
                 startTime: '',
                 endTime: '',
                 verslaglegger: '',
@@ -802,8 +830,14 @@
                                 if (match) {
                                     const [, day, month, year, hours, minutes] = match;
                                     
-                                    // Format date as YYYY-MM-DD for input[type="date"]
-                                    const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                                    // Create proper date object and format to ISO date (YYYY-MM-DD)
+                                    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                    if (isNaN(dateObj.getTime())) {
+                                        console.warn('Invalid date components:', day, month, year);
+                                        return { date: '', startTime: '', endTime: '' };
+                                    }
+                                    
+                                    const formattedDate = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD format
                                     
                                     // Format start time as HH:MM
                                     const startTime = `${hours.padStart(2, '0')}:${minutes}`;
@@ -847,7 +881,7 @@
                                 feitomschrijving: '', // Set to blank as requested
                                 vooronderzoek: findColumnValue(row, ['Vooronderzoek', 'vooronderzoek']),
                                 reactie: '',
-                                hearingDate: date || new Date().toISOString().split('T')[0],
+                                hearingDate: date || ensureISODate(new Date()),
                                 startTime: startTime,
                                 endTime: endTime,
                                 verslaglegger: findColumnValue(row, ['Verslaglegger', 'verslaglegger']),
@@ -875,7 +909,7 @@
                                 feitomschrijving: '',
                                 vooronderzoek: '',
                                 reactie: '',
-                                hearingDate: new Date().toISOString().split('T')[0],
+                                hearingDate: ensureISODate(new Date()),
                                 startTime: '',
                                 endTime: '',
                                 verslaglegger: '',
@@ -1172,7 +1206,7 @@
                             feitomschrijving: '',
                             vooronderzoek: '',
                             reactie: '',
-                            hearingDate: selectedDate,
+                            hearingDate: ensureISODate(selectedDate),
                             startTime: '',
                             endTime: '',
                             verslaglegger: '',
