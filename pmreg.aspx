@@ -955,12 +955,12 @@
                             <div class="mt-4 flex flex-col">
                                 <label for=${`feitomschrijving-${id}`} class="mb-1 font-semibold text-gray-600 flex items-center">
                                     Feitomschrijving
-                                    ${feitcodeLookupLoading && html`
+                                    ${feitcodeLookupLoading ? html`
                                         <div class="ml-2 flex items-center text-sm text-blue-600">
                                             <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-1"></div>
                                             Bezig met laden...
                                         </div>
-                                    `}
+                                    ` : null}
                                 </label>
                                 <input
                                     type="text"
@@ -995,7 +995,7 @@
                             </div>
 
                             <!-- Gesproken Met (conditional) -->
-                            ${!useGlobalGesprokenMet && html`
+                            ${!useGlobalGesprokenMet ? html`
                                 <div class="mb-4 flex flex-col">
                                     <label for=${`gesprokenMet-${id}`} class="mb-1 font-semibold text-gray-600">Gesproken Met</label>
                                     <input
@@ -1009,7 +1009,7 @@
                                         placeholder="Met wie is er gesproken?"
                                     />
                                 </div>
-                            `}
+                            ` : null}
 
                             <!-- Reactie burger/gemachtigde -->
                             <div class="mb-4 flex flex-col">
@@ -1072,7 +1072,7 @@
                                 
                                 <!-- Legacy Individual Save Button -->
                                 <div class="flex space-x-2">
-                                    ${hasSharePointId && html`
+                                    ${hasSharePointId ? html`
                                         <button
                                             onClick=${handleTempSave}
                                             disabled=${connectionStatus !== 'success'}
@@ -1081,7 +1081,7 @@
                                         >
                                             Temp. Opslaan (Legacy)
                                         </button>
-                                    `}
+                                    ` : null}
                                     <button
                                         onClick=${handleSaveCase}
                                         disabled=${connectionStatus !== 'success'}
@@ -1968,27 +1968,27 @@
                                         </button>
                                         
                                         <!-- Floating Date Menu -->
-                                        ${showDateMenu && html`
+                                        ${showDateMenu ? html`
                                             <div class="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-30 max-h-96 overflow-y-auto">
                                                 <div class="p-4 border-b border-gray-200">
                                                     <h3 class="text-lg font-semibold text-gray-800">Beschikbare Datums</h3>
                                                     <p class="text-sm text-gray-600">Selecteer een datum om onafgeronde zaken te laden</p>
                                                 </div>
                                                 
-                                                ${loadingDates && html`
+                                                ${loadingDates ? html`
                                                     <div class="p-6 text-center">
                                                         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
                                                         <p class="text-gray-600">Datums laden...</p>
                                                     </div>
-                                                `}
+                                                ` : null}
                                                 
-                                                ${!loadingDates && availableDates.length === 0 && html`
+                                                ${(!loadingDates && availableDates.length === 0) ? html`
                                                     <div class="p-6 text-center">
                                                         <p class="text-gray-600">Geen onafgeronde zaken gevonden</p>
                                                     </div>
-                                                `}
+                                                ` : null}
                                                 
-                                                ${!loadingDates && availableDates.length > 0 && html`
+                                                ${(!loadingDates && availableDates.length > 0) ? html`
                                                     <div class="max-h-72 overflow-y-auto">
                                                         ${availableDates.map(dateInfo => html`
                                                             <button
@@ -2010,7 +2010,7 @@
                                                             </button>
                                                         `)}
                                                     </div>
-                                                `}
+                                                ` : null}
                                                 
                                                 <div class="p-3 border-t border-gray-200">
                                                     <button
@@ -2021,7 +2021,7 @@
                                                     </button>
                                                 </div>
                                             </div>
-                                        `}
+                                        ` : null}
                                     </div>
                                     
                                     <input
@@ -2122,7 +2122,7 @@
                                     <!-- Row 2: GesprokenMet input and Gemachtigde/Burger toggle -->
                                     <div class="flex flex-wrap items-center gap-4">
                                         <!-- Global GesprokenMet Input (only shown when toggle is ON) -->
-                                        ${useGlobalGesprokenMet && html`
+                                        ${useGlobalGesprokenMet ? html`
                                             <div class="flex items-center space-x-3">
                                                 <label for="global-gesproken-met" class="text-sm font-medium text-gray-700">Gesproken Met:</label>
                                                 <input
@@ -2134,7 +2134,7 @@
                                                     placeholder="Met wie gesproken"
                                                 />
                                             </div>
-                                        `}
+                                        ` : null}
                                         
                                         <!-- Gemachtigde/Burger Toggle -->
                                         <div class="flex items-center space-x-3">
@@ -2162,7 +2162,7 @@
                                         </div>
                                         
                                         <!-- Bedrijfsnaam (only shown when Gemachtigde is selected) -->
-                                        ${isGemachtigde && html`
+                                        ${isGemachtigde ? html`
                                             <div class="flex items-center space-x-3">
                                                 <label for="global-bedrijfsnaam" class="text-sm font-medium text-gray-700">Bedrijfsnaam:</label>
                                                 <input
@@ -2174,7 +2174,7 @@
                                                     placeholder="Naam van het bedrijf"
                                                 />
                                             </div>
-                                        `}
+                                        ` : null}
                                     </div>
                                 </div>
                             </div>
