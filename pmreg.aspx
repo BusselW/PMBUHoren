@@ -15,6 +15,16 @@
 
         // Initialize htm with Preact
         const html = htm.bind(h);
+        
+        // Safer HTML helper that ensures valid nodes
+        const safeHtml = (template, ...substitutions) => {
+            try {
+                return html(template, ...substitutions);
+            } catch (error) {
+                console.error('Template rendering error:', error);
+                return html`<div class="text-red-500">Rendering error</div>`;
+            }
+        };
 
         // Import SharePoint service and config
         // Note: In production, these would be proper ES6 imports
@@ -1114,26 +1124,35 @@
                         console.log('Testing SharePoint connection...');
                         await sharePointService.testConnection();
                         
-                        // Use setTimeout to prevent immediate state update during render
-                        setTimeout(() => {
-                            setConnectionStatus('success');
-                            console.log('SharePoint connection test successful');
-                        }, 0);
+                        // Use multiple layers of async scheduling to ensure state update is safe
+                        requestAnimationFrame(() => {
+                            setTimeout(() => {
+                                requestAnimationFrame(() => {
+                                    setConnectionStatus('success');
+                                    console.log('SharePoint connection test successful');
+                                });
+                            }, 50);
+                        });
                         
                     } catch (error) {
-                        setTimeout(() => {
-                            setConnectionStatus('failed');
-                            console.error('SharePoint connection test failed:', error);
-                            setModalContent({
-                                title: 'SharePoint Verbindingsfout',
-                                message: `Kan geen verbinding maken met SharePoint: ${error.message}`
-                            });
-                            setShowInfoModal(true);
-                        }, 0);
+                        requestAnimationFrame(() => {
+                            setTimeout(() => {
+                                requestAnimationFrame(() => {
+                                    setConnectionStatus('failed');
+                                    console.error('SharePoint connection test failed:', error);
+                                    setModalContent({
+                                        title: 'SharePoint Verbindingsfout',
+                                        message: `Kan geen verbinding maken met SharePoint: ${error.message}`
+                                    });
+                                    setShowInfoModal(true);
+                                });
+                            }, 50);
+                        });
                     }
                 };
                 
-                testConnection();
+                // Delay the initial connection test slightly
+                setTimeout(testConnection, 100);
             }, []);
 
             // Close date menu when clicking outside
@@ -1801,6 +1820,32 @@
                 setShowDateMenu(!showDateMenu);
             };
 
+            // Helper function to render connection status safely
+            const renderConnectionStatus = (status) => {
+                switch (status) {
+                    case 'checking':
+                        return html`
+                            <div class="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                            <span class="text-sm text-yellow-600">Verbinding testen...</span>
+                        `;
+                    case 'success':
+                        return html`
+                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <span class="text-sm text-green-600">SharePoint verbonden</span>
+                        `;
+                    case 'failed':
+                        return html`
+                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <span class="text-sm text-red-600">Verbindingsfout</span>
+                        `;
+                    default:
+                        return html`
+                            <div class="w-3 h-3 bg-gray-500 rounded-full"></div>
+                            <span class="text-sm text-gray-600">Onbekend</span>
+                        `;
+                }
+            };
+
             const handleLoadCasesForDate = async (selectedDate) => {
                 setIsLoading(true);
                 setShowDateMenu(false);
@@ -1886,14 +1931,14 @@
             return html`
                 <div class="bg-gray-50 min-h-screen font-sans">
                     <!-- Loading Overlay -->
-                    ${isLoading && html`
+                    ${isLoading ? html`
                         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                             <div class="bg-white p-8 rounded-lg shadow-2xl max-w-sm w-full text-center mx-4">
                                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                                 <p class="text-gray-700">Bezig met opslaan...</p>
                             </div>
                         </div>
-                    `}
+                    ` : null}
                     
                     <!-- Header -->
                     <header class="bg-white shadow-sm sticky top-0 z-20">
@@ -1903,18 +1948,7 @@
                                 <div class="flex items-center space-x-4">
                                     <h1 class="text-3xl font-bold text-gray-800">Hoorzitting Notulen</h1>
                                     <div class="flex items-center space-x-2">
-                                        ${(connectionStatus === 'checking') && html`
-                                            <div class="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
-                                            <span class="text-sm text-yellow-600">Verbinding testen...</span>
-                                        `}
-                                        ${(connectionStatus === 'success') && html`
-                                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                                            <span class="text-sm text-green-600">SharePoint verbonden</span>
-                                        `}
-                                        ${(connectionStatus === 'failed') && html`
-                                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                                            <span class="text-sm text-red-600">Verbindingsfout</span>
-                                        `}
+                                        ${renderConnectionStatus(connectionStatus)}
                                     </div>
                                 </div>
                                 <div class="flex items-center justify-between">
@@ -2150,12 +2184,19 @@
                     <!-- Main Content -->
                     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
                         <div class="max-w-6xl mx-auto">
-                            ${(cases || []).map((caseItem, index) => {
-                                if (!caseItem || typeof index !== 'number') return null;
+                            ${Array.isArray(cases) ? cases.map((caseItem, index) => {
+                                // Ensure we have valid data
+                                if (!caseItem || typeof caseItem !== 'object' || typeof index !== 'number') {
+                                    return null;
+                                }
+                                
+                                // Create a unique, stable key
+                                const stableKey = caseItem.id || `case-${index}`;
+                                
                                 return html`
-                                    <${ErrorBoundary} key=${`error-boundary-${index}`}>
+                                    <${ErrorBoundary} key=${`boundary-${stableKey}`}>
                                         <${CaseCard}
-                                            key=${caseItem.id || `case-${index}`}
+                                            key=${stableKey}
                                             caseData=${caseItem}
                                             index=${index}
                                             onUpdate=${handleUpdateCase}
@@ -2171,16 +2212,16 @@
                                         />
                                     </${ErrorBoundary}>
                                 `;
-                            }).filter(Boolean)}
+                            }).filter(item => item !== null && item !== undefined) : []}
                         </div>
                     </main>
                     
                     <!-- Info Modal Component -->
-                    ${showInfoModal && html`
+                    ${showInfoModal ? html`
                         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                             <div class="bg-white p-8 rounded-lg shadow-2xl max-w-sm w-full text-center mx-4">
-                                <h2 class="text-2xl font-bold mb-4">${modalContent.title}</h2>
-                                <p class="text-gray-700 mb-6">${modalContent.message}</p>
+                                <h2 class="text-2xl font-bold mb-4">${modalContent.title || ''}</h2>
+                                <p class="text-gray-700 mb-6">${modalContent.message || ''}</p>
                                 <button
                                     onClick=${closeInfoModal}
                                     class="bg-blue-600 text-white font-bold py-2 px-8 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300"
@@ -2189,10 +2230,10 @@
                                 </button>
                             </div>
                         </div>
-                    `}
+                    ` : null}
                     
                     <!-- Confirmation Modal for Reset -->
-                    ${showConfirmModal && html`
+                    ${showConfirmModal ? html`
                         <div class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
                             <div class="bg-white p-8 rounded-lg shadow-2xl max-w-sm w-full text-center mx-4">
                                 <h2 class="text-2xl font-bold mb-2 text-gray-800">Weet u het zeker?</h2>
@@ -2213,7 +2254,7 @@
                                 </div>
                             </div>
                         </div>
-                    `}
+                    ` : null}
                 </div>
             `;
         };
