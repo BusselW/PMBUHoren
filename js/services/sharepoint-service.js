@@ -1,8 +1,6 @@
-import { SHAREPOINT_CONFIG } from '../config/constants.js';
-import { formatDateForSharePoint } from './date-utils.js';
+import { SHAREPOINT_CONFIG } from '../config/config.js';
 
-// SharePoint Service Class
-export class SharePointService {
+class SharePointService {
     constructor() {
         this.siteUrl = SHAREPOINT_CONFIG.siteUrl;
         this.listName = SHAREPOINT_CONFIG.listName;
@@ -313,6 +311,19 @@ export class SharePointService {
     }
 
     transformCaseToSharePoint(caseData) {
+        // Helper function to format date to ISO string for SharePoint
+        const formatDateForSharePoint = (dateStr) => {
+            if (!dateStr) return null;
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return null;
+                return date.toISOString();
+            } catch (error) {
+                console.warn('Invalid date format:', dateStr);
+                return null;
+            }
+        };
+
         return {
             Title: caseData.zaaknummer || '',
             Feitcode: caseData.feitcode || '',
@@ -331,58 +342,24 @@ export class SharePointService {
             Verslaglegger: caseData.verslaglegger || '',
             GesprokenMet: caseData.gesprokenMet || '',
             Bedrijfsnaam: caseData.bedrijfsnaam || '',
-            Status: caseData.status || 'Nieuw'
+            Status: caseData.status || 'Bezig met uitwerken'
         };
     }
 
-    transformSharePointToCase(spItem) {
-        return {
-            id: spItem.Id,
-            zaaknummer: spItem.Title || '',
-            feitcode: spItem.Feitcode || '',
-            cjibNummer: spItem.CJIBNummer || '',
-            cjibLast4: spItem.CJIBNummer ? spItem.CJIBNummer.slice(-4) : '', // Display-only: last 4 digits
-            betrokkene: spItem.Betrokkene || '',
-            eigenaar: spItem.Eigenaar || '',
-            soort: spItem.Soort || '',
-            aantekeninghoorverzoek: spItem.AantekeningHoorverzoek || '',
-            feitomschrijving: spItem.Feitomschrijving || '',
-            vooronderzoek: spItem.Vooronderzoek || '',
-            reactie: spItem.ReactiePMBU || '',
-            hearingDate: spItem.HearingDate ? new Date(spItem.HearingDate).toISOString().split('T')[0] : '',
-            startTime: spItem.StartTime || '',
-            endTime: spItem.EndTime || '',
-            verslaglegger: spItem.Verslaglegger || '',
-            gesprokenMet: spItem.GesprokenMet || '',
-            bedrijfsnaam: spItem.Bedrijfsnaam || '',
-            status: spItem.Status || 'Nieuw',
-            isFromSharePoint: true
-        };
-    }
-}
-
-// Feitcode lookup service
-export class FeitcodeLookupService {
-    constructor() {
-        this.config = SHAREPOINT_CONFIG.feitcodeLookup;
-    }
-
-    async getFeitomschrijving(feitcode) {
+    // Method to lookup Feitomschrijving based on Feitcode
+    async getFeitomschrijvingByFeitcode(feitcode) {
         if (!feitcode || feitcode.trim() === '') {
             return '';
         }
 
         try {
-            console.log('Looking up Feitomschrijving for Feitcode:', feitcode);
+            const lookupConfig = SHAREPOINT_CONFIG.feitcodeLookup;
+            const filter = `Feitcode eq '${feitcode.trim()}'`;
+            const apiUrl = `${lookupConfig.apiUrl}lists/getbytitle('${lookupConfig.listName}')/items?$filter=${encodeURIComponent(filter)}&$select=Feitcode,Feitomschrijving`;
             
-            // Query the Feitcode list for matching code
-            const filter = `Feitcode eq '${feitcode.replace(/'/g, "''")}'`; // Escape single quotes
-            const select = 'Feitomschrijving';
-            const url = `${this.config.apiUrl}lists/getbytitle('${this.config.listName}')/items?$filter=${encodeURIComponent(filter)}&$select=${select}&$top=1`;
+            console.log('Fetching Feitomschrijving from:', apiUrl);
             
-            console.log('Feitcode lookup URL:', url);
-            
-            const response = await fetch(url, {
+            const response = await fetch(apiUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json;odata=verbose'
@@ -391,24 +368,26 @@ export class FeitcodeLookupService {
             });
             
             if (!response.ok) {
-                console.error('Feitcode lookup failed:', response.status);
+                console.warn(`HTTP error when fetching Feitomschrijving: ${response.status}`);
                 return '';
             }
             
             const data = await response.json();
-            const results = data.d.results;
             
-            if (results && results.length > 0) {
-                const feitomschrijving = results[0].Feitomschrijving || '';
-                console.log('Found Feitomschrijving:', feitomschrijving);
-                return feitomschrijving;
+            if (data.d && data.d.results && data.d.results.length > 0) {
+                const result = data.d.results[0];
+                console.log('Found Feitomschrijving:', result.Feitomschrijving);
+                return result.Feitomschrijving || '';
+            } else {
+                console.log(`No Feitomschrijving found for Feitcode: ${feitcode}`);
+                return '';
             }
             
-            console.log('No Feitomschrijving found for Feitcode:', feitcode);
-            return '';
         } catch (error) {
-            console.error('Error looking up Feitomschrijving:', error);
+            console.error('Error fetching Feitomschrijving:', error);
             return '';
         }
     }
 }
+
+export { SharePointService };
