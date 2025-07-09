@@ -625,8 +625,8 @@
                         setTimeout(async () => {
                             // Double-check the value hasn't changed
                             if (caseData.feitcode === currentValue) {
-                                setFeitcodeLookupLoading(true);
                                 try {
+                                    setFeitcodeLookupLoading(true);
                                     const feitomschrijving = await sharePointService.getFeitomschrijvingByFeitcode(currentValue);
                                     if (feitomschrijving && caseData.feitcode === currentValue) {
                                         // Create updated case data
@@ -635,7 +635,10 @@
                                             feitomschrijving: feitomschrijving,
                                             isModified: true
                                         };
-                                        onUpdate(index, updatedCaseWithFeitomschrijving);
+                                        // Schedule the update safely
+                                        requestAnimationFrame(() => {
+                                            onUpdate(index, updatedCaseWithFeitomschrijving);
+                                        });
                                     }
                                 } catch (error) {
                                     console.warn('Failed to lookup Feitomschrijving:', error);
@@ -741,14 +744,14 @@
                     <div class="flex justify-between items-center mb-4">
                         <div class="flex items-center space-x-3">
                             <h3 class="text-xl font-bold text-gray-700">Zaak #${(index || 0) + 1}</h3>
-                            ${hasSharePointId && html`
+                            ${hasSharePointId ? html`
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                     </svg>
                                     SharePoint
                                 </span>
-                            `}
+                            ` : ''}
                         </div>
                     </div>
                     <div class="grid grid-cols-1 gap-6">
@@ -1033,7 +1036,7 @@
                                 <div class="flex space-x-2">
                                     <button
                                         onClick=${() => handleIndividualTempSave(index)}
-                                        ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
+                                        disabled=${connectionStatus !== 'success'}
                                         class="bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Tijdelijk opslaan - status wordt 'In behandeling'"
                                     >
@@ -1041,7 +1044,7 @@
                                     </button>
                                     <button
                                         onClick=${() => handleIndividualPrepareForDocGen(index)}
-                                        ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
+                                        disabled=${connectionStatus !== 'success'}
                                         class="bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Klaarzetten voor DocGen"
                                     >
@@ -1049,7 +1052,7 @@
                                     </button>
                                     <button
                                         onClick=${() => handleIndividualFinalize(index)}
-                                        ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
+                                        disabled=${connectionStatus !== 'success'}
                                         class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Definitief afhandelen - status wordt 'Afgehandeld'"
                                     >
@@ -1062,7 +1065,7 @@
                                     ${hasSharePointId && html`
                                         <button
                                             onClick=${handleTempSave}
-                                            ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
+                                            disabled=${connectionStatus !== 'success'}
                                             class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Oude tijdelijke opslag (behoudt huidige status)"
                                         >
@@ -1071,7 +1074,7 @@
                                     `}
                                     <button
                                         onClick=${handleSaveCase}
-                                        ...${ connectionStatus !== 'success' ? { disabled: true } : {} }
+                                        disabled=${connectionStatus !== 'success'}
                                         class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         title=${hasSharePointId ? "Opslaan zonder status wijziging" : "Nieuwe zaak opslaan"}
                                     >
@@ -1108,17 +1111,25 @@
             useEffect(() => {
                 const testConnection = async () => {
                     try {
+                        console.log('Testing SharePoint connection...');
                         await sharePointService.testConnection();
-                        setConnectionStatus('success');
-                        console.log('SharePoint connection test successful');
+                        
+                        // Use setTimeout to prevent immediate state update during render
+                        setTimeout(() => {
+                            setConnectionStatus('success');
+                            console.log('SharePoint connection test successful');
+                        }, 0);
+                        
                     } catch (error) {
-                        setConnectionStatus('failed');
-                        console.error('SharePoint connection test failed:', error);
-                        setModalContent({
-                            title: 'SharePoint Verbindingsfout',
-                            message: `Kan geen verbinding maken met SharePoint: ${error.message}`
-                        });
-                        setShowInfoModal(true);
+                        setTimeout(() => {
+                            setConnectionStatus('failed');
+                            console.error('SharePoint connection test failed:', error);
+                            setModalContent({
+                                title: 'SharePoint Verbindingsfout',
+                                message: `Kan geen verbinding maken met SharePoint: ${error.message}`
+                            });
+                            setShowInfoModal(true);
+                        }, 0);
                     }
                 };
                 
@@ -1141,18 +1152,32 @@
 
             // Effect to scroll to the active card
             useEffect(() => {
-                const activeCard = document.getElementById(`case-card-${activeCaseIndex}`);
-                if (activeCard) {
-                    activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
+                // Use setTimeout to ensure DOM is ready and prevent timing issues
+                const timeoutId = setTimeout(() => {
+                    try {
+                        const activeCard = document.getElementById(`case-card-${activeCaseIndex}`);
+                        if (activeCard && typeof activeCard.scrollIntoView === 'function') {
+                            activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    } catch (error) {
+                        console.warn('Error scrolling to active card:', error);
+                    }
+                }, 100);
+                
+                return () => clearTimeout(timeoutId);
             }, [activeCaseIndex]);
 
             // Update a specific case in the state
             const handleUpdateCase = useCallback((index, updatedCase) => {
-                const newCases = [...cases];
-                newCases[index] = updatedCase;
-                setCases(newCases);
-            }, [cases]);
+                // Use requestAnimationFrame to schedule state update safely
+                requestAnimationFrame(() => {
+                    setCases(prevCases => {
+                        const newCases = [...prevCases];
+                        newCases[index] = updatedCase;
+                        return newCases;
+                    });
+                });
+            }, []);
             
             // Set the currently focused case
             const handleFocusCase = useCallback((index) => {
@@ -1878,15 +1903,15 @@
                                 <div class="flex items-center space-x-4">
                                     <h1 class="text-3xl font-bold text-gray-800">Hoorzitting Notulen</h1>
                                     <div class="flex items-center space-x-2">
-                                        ${connectionStatus === 'checking' && html`
+                                        ${(connectionStatus === 'checking') && html`
                                             <div class="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
                                             <span class="text-sm text-yellow-600">Verbinding testen...</span>
                                         `}
-                                        ${connectionStatus === 'success' && html`
+                                        ${(connectionStatus === 'success') && html`
                                             <div class="w-3 h-3 bg-green-500 rounded-full"></div>
                                             <span class="text-sm text-green-600">SharePoint verbonden</span>
                                         `}
-                                        ${connectionStatus === 'failed' && html`
+                                        ${(connectionStatus === 'failed') && html`
                                             <div class="w-3 h-3 bg-red-500 rounded-full"></div>
                                             <span class="text-sm text-red-600">Verbindingsfout</span>
                                         `}
@@ -1899,7 +1924,7 @@
                                     <div class="relative date-menu-container">
                                         <button
                                             onClick=${handleToggleDateMenu}
-                                            ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
+                                            disabled=${isLoading || connectionStatus !== 'success'}
                                             class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                                         >
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1974,14 +1999,14 @@
                                     />
                                     <button
                                         onClick=${() => document.getElementById('excel-import').click()}
-                                        ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
+                                        disabled=${isLoading || connectionStatus !== 'success'}
                                         class="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Excel Import
                                     </button>
                                     <button
                                         onClick=${handleResetAll}
-                                        ...${ isLoading ? { disabled: true } : {} }
+                                        disabled=${isLoading}
                                         class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Resetten
@@ -1992,21 +2017,21 @@
                                 <div class="flex items-center space-x-3">
                                     <button
                                         onClick=${handleTempSaveAll}
-                                        ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
+                                        disabled=${isLoading || connectionStatus !== 'success'}
                                         class="bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-4 focus:ring-orange-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Alles Tijdelijk Opslaan
                                     </button>
                                     <button
                                         onClick=${handlePrepareForDocGen}
-                                        ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
+                                        disabled=${isLoading || connectionStatus !== 'success'}
                                         class="bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-4 focus:ring-yellow-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Alles Klaarzetten DocGen
                                     </button>
                                     <button
                                         onClick=${handleFinalizeAll}
-                                        ...${ (isLoading || connectionStatus !== 'success') ? { disabled: true } : {} }
+                                        disabled=${isLoading || connectionStatus !== 'success'}
                                         class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Alles Definitief
